@@ -9,15 +9,26 @@ QUESTIONS FOR AUTHOR
    - If spreadsheet: are those the actual cases you've tested/analyzed?
    - If JSON: why does it have fewer cases? Are some omitted or grouped differently?
 
+The dataset is good, because it has both the standard algorithms and more searched algorithms. This project will only use the standard most upvoted algorithms
+and then use other algorithms for testing knowing algs from other angles (which therefore skips the pre-auf). You should be moving everything to JSON, I jut put that
+spreadsheet there for a random reference for something I've looked at before.
+
 2. **Case counts vs. algorithm angles:**
    - Should each case have one movecount (the "best" algorithm by some metric), or a distribution across all available angles?
    - If multiple angles: do you want to weight them by vote count/score from the JSON, or treat them as equally likely?
    - The paper mentions "alternate OLL and PLL angles" as a technique—should the baseline use the single best angle per case, or does it already account for angle selection?
 
+we are testing standard angles, and seeing how other angles will change that movecount distribution, but only using algorithms that rank equal or higher than that alg for the
+speed ranking. In the end, we are of course using the STM movecount, but that speed ranking is just a good way to decide when using another alg for a different angle is actually
+worth it. The baseline uses the most upvoted alg, and then you find all of the higher ranked algorithms, which will also be used if gotten from that angle, assuming that we are turning
+on the multiple angle technique, and seeing how the movecount changes. I digress.
+
 3. **Last-slot (LS) data:**
    - The spreadsheet has ~1000 rows labeled as "LS" (last-slot insertion cases).
    - Is this the full set of F2L last-pair cases (~40-50 expected), or are there duplicates/variants counted separately?
    - Are these case names/labels standardized, and do they correspond to the F2L cases in your model?
+
+I dont really know, really just use the simulator folder as reference, I know that has all of the algs organized and verified to work.
 
 ## Movecount Metric and Parsing
 
@@ -27,22 +38,32 @@ QUESTIONS FOR AUTHOR
    - Should I count wide moves (r, M, u) as 1 move or 2?
    - Should pre/post AUF moves (in the JSON, marked as 'pre' and 'post' fields) be added to the algorithm movecount, or are they tracked separately?
 
+U2 counts as one move. We are using STM, which has EVERYTHING counting as one move, and rotations counting for zero. Very simple, thats it no questions asked.
+AUF's obviously count for the movecount because they are part. of. the. solve...
+
 5. **Movecount in the spreadsheet:**
    - The spreadsheet's column E (movecount) contains formulas that count characters in the algorithm string.
    - That formula seems to strip brackets, apostrophes, spaces, 2's, commas, colons. Is that the correct FTM count?
    - Should I verify this parsing against the cubing standard?
 
+I don't know about that specific formula, but the sheet is unreliable tbh. Just make sure you know EXACTLY what STM is, and use that from here forward.
+
 ## AUF (Adjustment of Upper Face)
 
 6. **AUF distribution and application:**
    - You said P(0) = 0.25, P(1) = 0.75 for AUF. Is this pre-AUF, post-AUF, or both?
+both
    - Should pre-AUF and post-AUF be the same distribution, or different?
+same exact thing, this is common sense.
    - In the spreadsheet's "combine" sheet, AUFs are applied with mixed probabilities (0.25 for 0 angles, 0.75 for 4 angles, etc.). What is the logic here? Is it based on how many angle variants exist, or something else?
+If you have to do a move in the solve, its a move that counts as a move...? Like what do you mean. If you have selected an alg as an alternate angle alg, then you don't have to do AUF, and then you don't do a move...
 
 7. **When is AUF applied:**
    - Pre-AUF: before last-slot insertion? Before OLL? (spreadsheet shows both)
    - Post-AUF: after PLL, before the next solve starts? Or is it optional/situational?
    - Should the baseline always include AUFs at each stage, or only when the cube state requires them?
+
+any time you literally need to do a move to solve the cube, that isn't part of an algorithm, and is a U move, is an AUF...
 
 ## Cube Simulator and Testing
 
@@ -58,25 +79,34 @@ QUESTIONS FOR AUTHOR
      - Detecting edge-orientation changes?
    - Do you have example code or a reference for how to interface with it?
 
+read the README and just figure out how to use it yourself, its for simulation
+
 9. **Algorithm testing approach:**
    - How should I verify movecount parsing?
      - Test against a reference implementation (magiccube's move count)?
      - Manually verify a few examples by hand?
+STM
    - For testing sledge inserts and edge-orientation changes:
      - Should I apply the sledge to a sample cube state and check if edges flip?
      - Which library/tool should simulate this (magiccube, crossSolver, or something else)?
+you simulate all possible states, and what OLL the sledge gives, or the U2 insert.
    - Should I enumerate all cases, sample a subset, or just verify correctness on a few?
+you enumerate all cases and then agregate to a distribution.
 
 ## Algorithm Definitions and Data Gaps
 
 10. **U2 insert and sledge algorithms:**
     - What is your exact definition of "U2 insert"? (the algorithms you mentioned as [NEEDED FROM AUTHOR])
+    U R U2 R', when you could have done R U' R' to solve a pair
+    This counts for any time a pair ends with R U' R', you could replace it with the U2, or the other way around btw.
     - Sledge insert: is this always R' F R F', or are there variants?
-    - What is the standard insert baseline to compare against? (e.g., M2 U' M U2 M' U M2 for 1x2x3 edge insertion?)
+    same idea, U' R' F R F' replaces R U' R' or vise versa at any point, leading to two possible OLL's to "pick from"
 
 11. **COLL coverage:**
     - The JSON has coll.json with 42 cases. Is this the full COLL set you want to analyze?
+sure, why not
     - Should I check whether COLL's movecount is typically shorter than OLL+EPLL?
+well yea, that would be part of the whole study is comparing not only LSLL, but LSOLL, OLL+PLL, and other useful metrics like ZBLS-ZBLL compared to CFOP
 
 ## Codebase Structure Preferences
 
@@ -89,9 +119,14 @@ QUESTIONS FOR AUTHOR
       - Simulation (integration with magiccube or other cube libraries)
       - Results/reporting (tables, charts, statistics)
 
+whatever you decide is best for the development of the math paper.
+
 13. **Configuration and defaults:**
     - Should the codebase have a config file specifying which algorithms to use (best by score? by speed?)
     - Should AUF parameters be easily swappable for sensitivity analysis?
+
+already specified, technically speed is used for picking alternate algs to use, but nowhere else.
+use best judgement, but Im pretty sure we should never be swapping the sensitivity of moves, whatever that means.
 
 ## Validation and Scope
 
@@ -99,9 +134,14 @@ QUESTIONS FOR AUTHOR
     - You mentioned in the outline that real solve data might be available. Do you have reconstructed solves (video analysis, move logs) to validate against?
     - If yes, in what format? (move sequences, case labels, movecount per step?)
 
+I added a file of solver data, that we might or might not use later, but you can look at it if it helps you.
+
 15. **Baseline scope:**
     - Should the baseline include setup moves/rotations (x, y, z), or only the core algorithm?
     - Is the baseline "average case" (mixing all cases equally), or should it account for F2L solution distribution?
+
+only rotations allowed when an algorithm has them, no setup. By the way, we are constraining this priject to ONLY FRONT RIGHT LAST SLOT LAST LAYER. A lot of the data in the
+data folder I just added has the last pair being not front right, so you have to take note of that if it would change things.
 
 ---
 
@@ -114,3 +154,5 @@ Once you clarify:
 4. I'll set up a framework for simulation/testing with magiccube (once you clarify what it is).
 5. I'll create an elegant convolution pipeline that doesn't hardcode AUF combinations.
 
+
+I have given all answers needed for you to finish everything except the actual writing of the paper by me, which will be done by using the outline, and aggregating all results that I feel are pertinent to the paper.

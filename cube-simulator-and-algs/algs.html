@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cubetree · Algs</title>
+    <link rel="stylesheet" href="styles.css?v=57">
+    <script src="js/profile.js?v=57"></script>
+</head>
+
+<body>
+    <header class="header">
+        <a class="logo" href="solver.html">cube<svg class="fork" viewBox="0 0 12 17" aria-hidden="true"><path d="M6 16V10M6 10C6 7 2 8 2 4V1M6 10C6 7 10 8 10 4V1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>tree</a>
+        <nav class="tabs" aria-label="pages">
+            <a class="tab" href="solver.html">Solve</a>
+            <a class="tab" href="algs.html" aria-current="page">Algs</a>
+        </nav>
+        <div class="userbar">
+            <button type="button" class="btn" id="info-btn">Help</button>
+            <a class="profile-chip" id="profile-chip" href="index.html?profiles" title="Switch profile">
+                <span class="initial" aria-hidden="true"></span><span id="profile-name"></span>
+            </a>
+        </div>
+    </header>
+
+    <main class="algs-main">
+        <nav class="set-menu" aria-label="alg sets">
+            <ul class="set-list" id="set-tabs" role="tablist" aria-label="alg set"></ul>
+        </nav>
+
+        <section class="set-window" aria-labelledby="set-name">
+            <div class="set-head">
+                <h2 id="set-name" class="sr-only">OLL</h2>
+                <div class="algs-search" id="algs-search">
+                <div class="search-shadow" id="search-shadow" aria-hidden="true"></div>
+                <input type="text" id="alg-search" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off"
+                    aria-label="search cases by name, or type moves" aria-describedby="search-note" aria-autocomplete="inline">
+                </div>
+            </div>
+            <div class="search-note" id="search-note" role="status" aria-live="polite"></div>
+            <div class="set-bar" id="set-bar">
+                <p class="set-title" id="set-title"></p>
+                <div class="progress" id="progress" aria-live="polite"></div>
+            </div>
+            <div class="slot-bar" id="group-chips" role="group" aria-label="subsets"></div>
+            <div class="slot-bar sub" id="group-chips-2" role="group" aria-label="pair placement" hidden></div>
+            <p class="subset-note" id="subset-note"></p>
+            <div class="grid-tools" id="grid-tools">
+                <div class="seg" role="group" aria-label="show">
+                    <button type="button" class="chip" data-show="all" aria-pressed="true">All</button>
+                    <button type="button" class="chip" data-show="learn" aria-pressed="false">To learn</button>
+                    <button type="button" class="chip" data-show="known" aria-pressed="false">Known</button>
+                </div>
+                <button type="button" class="btn learn-btn" id="learn-mode" aria-pressed="false">Mark what I know</button>
+            </div>
+            <p class="learn-hint" id="learn-hint" hidden></p>
+            <section class="case-grid" id="case-grid" aria-label="cases"></section>
+            <section class="match-list" id="match-list" aria-label="matching algs" hidden></section>
+        </section>
+    </main>
+
+    <div class="case-card" id="case-card" role="tooltip" hidden></div>
+
+    <dialog class="popup case-dialog" id="case-dialog" aria-labelledby="case-title">
+        <div class="popup-head"><h2 id="case-title"></h2><button type="button" class="close-x" id="case-close" aria-label="close">&times;</button></div>
+        <div class="case-body">
+            <div class="case-view">
+                <div class="cube-stage case-stage" id="case-stage">
+                    <canvas id="case-cube" role="img" aria-label="the case on the cube"></canvas>
+                </div>
+                <div class="playback">
+                    <button type="button" class="btn" id="case-reset" aria-label="back to the case" title="Back to the case">&laquo;</button>
+                    <button type="button" class="btn" id="case-back" aria-label="one move back" title="Back one move">&lsaquo; Back</button>
+                    <button type="button" class="btn play" id="case-play" aria-label="play" title="Play">Play</button>
+                    <button type="button" class="btn" id="case-fwd" aria-label="one move forward" title="Forward one move">Next &rsaquo;</button>
+                </div>
+                <button type="button" class="btn known-btn" id="case-known" aria-pressed="false">I know this case</button>
+            </div>
+            <div class="case-algs">
+                <p class="case-sub" id="case-sub"></p>
+                <div class="alg-list-head" aria-hidden="true"><span>#</span><span>Alg</span><span>STM</span></div>
+                <ol class="alg-list" id="alg-list"></ol>
+            </div>
+        </div>
+    </dialog>
+
+    <script src="js/captions.js?v=57"></script>
+    <script src="js/pro-steps.js?v=57"></script>
+    <script src="js/script.js?v=57"></script>
+    <script src="js/facelet-cube.js?v=57"></script>
+    <script src="js/pixel-cube.js?v=57"></script>
+    <script src="js/alg-sets.js?v=57"></script>
+    <script src="js/last-layer.js?v=57"></script>
+    <script src="js/case-diagram.js?v=57"></script>
+    <script src="js/algs-ui.js?v=57"></script>
+</body>
+
+</html>

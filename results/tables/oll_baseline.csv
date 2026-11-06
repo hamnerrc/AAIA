@@ -1,0 +1,58 @@
+case,group,votes,alg,stm,score,states,P_no_pre_auf,qualifying_alternates,mean_alt_stm_minus_base
+OLL 1,Dot Case,143,R U2 R2 F R F' U2 R' F R F',11,65.4,576,1/2,0,
+OLL 2,Dot Case,89,R U' R2 D' r U r' D R2 U R',11,70.9,1152,1/4,10,0.9
+OLL 3,Dot Case,43,f R U R' U' f' U' F R U R' U' F',13,77.1,1152,1/4,12,-0.33
+OLL 4,Dot Case,42,R' F2 R2 U2 R' F' R U2 R2 F2 R,11,81.2,1152,1/4,12,2.33
+OLL 5,Square Shapes,77,r' U2 R U R' U r,7,43.5,1152,1/4,0,
+OLL 6,Square Shapes,86,r U2 R' U' R U' r',7,40.3,1152,1/4,0,
+OLL 7,Lightning Shapes,77,r U R' U R U2 r',7,38.0,1152,1/4,0,
+OLL 8,Lightning Shapes,51,r' U' R U' R' U2 r,7,44.0,1152,1/4,1,1.0
+OLL 9,Fish Shapes,89,R U R' U' R' F R2 U R' U' F',11,51.0,1152,1/4,0,
+OLL 10,Fish Shapes,58,R U R' U R' F R F' R U2 R',11,52.4,1152,1/4,0,
+OLL 11,Lightning Shapes,45,r' R2 U R' U R U2 R' U M',10,64.2,1152,1/4,3,1.0
+OLL 12,Lightning Shapes,37,M' R' U' R U' R' U2 R U' M,10,77.4,1152,1/4,13,2.0
+OLL 13,Knight Move Shapes,48,F U R U2 R' U' R U R' F',10,49.1,1152,1/4,0,
+OLL 14,Knight Move Shapes,56,R' F R U R' F' R F U' F',10,59.5,1152,1/4,0,
+OLL 15,Knight Move Shapes,40,r' U' r R' U' R U r' U r,10,59.7,1152,1/4,0,
+OLL 16,Knight Move Shapes,76,r U r' R U R' U' r U' r',10,50.7,1152,1/4,0,
+OLL 17,Dot Case,58,R U R' U R' F R F' U2 R' F R F',13,68.8,1152,1/4,3,-0.33
+OLL 18,Dot Case,42,R U2 R2 F R F' U2 M' U R U' r',12,74.5,1152,1/4,6,0.33
+OLL 19,Dot Case,48,S' R U R' S U' R' F R F',10,65.5,1152,1/4,0,
+OLL 20,Dot Case,57,r U R' U' M2 U R U' R' U' M',11,87.0,288,1,11,3.18
+OLL 21,OCLL,82,R U R' U R U' R' U R U2 R',11,38.5,576,1/2,0,
+OLL 22,OCLL,100,R U2 R2 U' R2 U' R2 U2 R,9,49.9,1152,1/4,0,
+OLL 23,OCLL,104,R2 D R' U2 R D' R' U2 R',9,52.3,1152,1/4,0,
+OLL 24,OCLL,117,r U R' U' r' F R F',8,42.8,1152,1/4,0,
+OLL 25,OCLL,97,R U2 R D R' U2 R D' R2,9,52.0,1152,1/4,10,1.5
+OLL 26,OCLL,83,R U2 R' U' R U' R',7,28.5,1152,1/4,0,
+OLL 27,OCLL,112,R U R' U R U2 R',7,26.9,1152,1/4,0,
+OLL 28,All Corners Oriented,113,r U R' U' M U R U' R',9,53.6,1152,1/4,1,-1.0
+OLL 29,Awkward Shapes,57,r2 D' r U r' D r2 U' r' U' r,11,97.4,1152,1/4,13,1.31
+OLL 30,Awkward Shapes,46,F U R U2 R' U' R U2 R' U' F',11,55.7,1152,1/4,0,
+OLL 31,P Shapes,78,R' U' F U R U' R' F' R,9,49.7,1152,1/4,0,
+OLL 32,P Shapes,74,S R U R' U' R' F R f',9,55.2,1152,1/4,2,0.5
+OLL 33,T Shapes,116,R U R' U' R' F R F',8,34.3,1152,1/4,0,
+OLL 34,C Shapes,80,f R f' U' r' U' R U M',9,74.7,1152,1/4,12,3.17
+OLL 35,Fish Shapes,56,R U2 R2 F R F' R U2 R',9,48.5,1152,1/4,0,
+OLL 36,W Shapes,59,R U R2 F' U' F U R2 U2 R',10,63.7,1152,1/4,5,2.2
+OLL 37,Fish Shapes,77,F R' F' R U R U' R',8,39.0,1152,1/4,0,
+OLL 38,W Shapes,92,R U R' U R U' R' U' R' F R F',12,47.5,1152,1/4,0,
+OLL 39,Lightning Shapes,46,f' r U r' U' r' F r S,9,83.6,1152,1/4,13,2.0
+OLL 40,Lightning Shapes,68,R' F R U R' U' F' U R,9,43.9,1152,1/4,0,
+OLL 41,Awkward Shapes,54,R U R' U R U2 R' F R U R' U' F',13,54.8,1152,1/4,0,
+OLL 42,Awkward Shapes,41,R' U' R U' R' U2 R F R U R' U' F',13,67.1,1152,1/4,4,0.0
+OLL 43,P Shapes,63,R' U' F' U F R,6,37.3,1152,1/4,0,
+OLL 44,P Shapes,75,f R U R' U' f',6,38.7,1152,1/4,1,0.0
+OLL 45,T Shapes,104,F R U R' U' F',6,31.5,1152,1/4,0,
+OLL 46,C Shapes,76,R' U' R' F R F' U R,8,45.3,1152,1/4,0,
+OLL 47,L Shapes,40,F R' F' R U2 R U' R' U R U2 R',12,57.6,1152,1/4,2,-0.5
+OLL 48,L Shapes,69,F R U R' U' R U R' U' F',10,43.3,1152,1/4,0,
+OLL 49,L Shapes,59,r U' r2 U r2 U r2 U' r,9,56.8,1152,1/4,1,0.0
+OLL 50,L Shapes,51,r' U r2 U' r2 U' r2 U r',9,44.6,1152,1/4,0,
+OLL 51,Line Shapes,64,F U R U' R' U R U' R' F',10,44.4,1152,1/4,0,
+OLL 52,Line Shapes,56,R' F' U' F U' R U R' U R,10,50.8,1152,1/4,1,0.0
+OLL 53,L Shapes,33,r' U' R U' R' U R U' R' U2 r,11,54.7,1152,1/4,1,0.0
+OLL 54,L Shapes,45,r U R' U R U' R' U R U2 r',11,48.2,1152,1/4,0,
+OLL 55,Line Shapes,51,R' F U R U' R2 F' R2 U R' U' R,12,72.8,576,1/2,4,2.75
+OLL 56,Line Shapes,33,r U r' U R U' R' U R U' R' r U' r',14,67.1,576,1/2,2,-1.0
+OLL 57,All Corners Oriented,96,R U R' U' M' U R U' r',9,50.4,576,1/2,0,

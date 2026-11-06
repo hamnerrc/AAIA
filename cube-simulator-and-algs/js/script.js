@@ -1,0 +1,1633 @@
+const FACES = ['U', 'D', 'R', 'L', 'F', 'B'];
+const TURN_MODIFIERS = ['', "'", '2'];
+const OPPOSITES = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'B', B: 'F' };
+const STORAGE_KEY = 'cubetree.criteria';
+const SESSION_STATE_KEY = 'cubetree.session';
+
+const SEARCH_CONFIG_CATEGORIES = ['cross', 'xcross', 'xxcross', 'xxxcross', 'singlePair', 'multislot'];
+
+// Always on (no checkbox): the pro move set and cross optimisation.
+const ALWAYS_ON_OPTIONS = ['cross_opt', 'pro_moves'];
+// Results-page view settings (look-ahead, multislot, wide moves, filters,
+// filter, page size).
+const VIEW_PREFS_KEY = 'cubetree.view';
+const RETIRED_OPTIONS = ['simplified_pseudo', 'multislotting'];
+// Saved-criteria format; 2: the time limit is null for none (was 60 by default).
+const CRITERIA_VERSION = 4;
+// Every saved setting is kept per profile (profile.js;
+// unscoped where profile.js is not loaded, e.g. Node tests).
+const scopedKey = (base) => (typeof profileKey === 'function' ? profileKey(base) : base);
+
+const sample = (array) => array[Math.floor(Math.random() * array.length)];
+const isRedundantMove = (curr, prev) => curr === prev || OPPOSITES[curr] === prev;
+
+function generateScramble(length = 22) {
+    const sequence = [];
+    let previousFace = null;
+
+    while (sequence.length < length) {
+        const face = sample(FACES);
+        if (isRedundantMove(face, previousFace)) continue;
+
+        sequence.push(face + sample(TURN_MODIFIERS));
+        previousFace = face;
+    }
+
+    return sequence.join(' ');
+}
+
+function populateScrambles() {
+    const textareaNode = document.getElementById('scramble-input');
+    if (!textareaNode) return;
+
+    const countInput = document.getElementById('scramble-count');
+    const count = Math.max(1, parseInt(countInput?.value, 10) || 1);
+
+    // Random-state (WCA-style) scrambles when random-state-scramble.js is
+    // loaded; the random-move generator above is only a fallback.
+    const nextScramble = typeof generateRandomStateScramble === 'function'
+        ? () => generateRandomStateScramble()
+        : () => generateScramble();
+    textareaNode.value = Array.from({ length: count }, nextScramble).join('\n');
+}
+
+function restoreTextareaState() {
+    const textareaNode = document.getElementById('scramble-input');
+    const rawState = localStorage.getItem(scopedKey(STORAGE_KEY));
+    if (!textareaNode || !rawState) return;
+
+    const { scrambles } = JSON.parse(rawState);
+    if (scrambles?.length) {
+        textareaNode.value = scrambles.join('\n');
+    }
+}
+
+function clearScrambleData() {
+    const textareaNode = document.getElementById('scramble-input');
+    if (textareaNode) textareaNode.value = '';
+
+    localStorage.removeItem(scopedKey(STORAGE_KEY));
+    // A fresh scramble list must not resurrect progress persisted against a
+    // different (now-cleared) search criteria blob.
+    localStorage.removeItem(scopedKey(SESSION_STATE_KEY));
+}
+
+function readSearchConfig() {
+    const config = {};
+    const readPair = (idPrefix) => {
+        const maxSolutions = parseInt(document.getElementById(`${idPrefix}-maxsol`)?.value, 10) || undefined;
+        const maxLength = parseInt(document.getElementById(`${idPrefix}-maxlen`)?.value, 10) || undefined;
+        return (maxSolutions || maxLength) ? { maxSolutions, maxLength } : null;
+    };
+
+    for (const key of SEARCH_CONFIG_CATEGORIES) {
+        const matched = readPair(`cfg-${key}`);
+        if (matched) config[key] = matched;
+        const pseudo = readPair(`cfg-${key}-pseudo`);
+        if (pseudo) config[`${key}Pseudo`] = pseudo;
+    }
+
+    return Object.keys(config).length ? config : undefined;
+}
+
+function buildLimitsTable() {
+    const body = typeof document !== 'undefined' && document.getElementById('limits-body');
+    if (!body || body.children.length) return;
+    const names = { cross: 'Cross', xcross: 'XCross', xxcross: 'XXCross', xxxcross: 'XXXCross', singlePair: 'Pair', multislot: 'Multislot' };
+    for (const key of SEARCH_CONFIG_CATEGORIES) {
+        const tr = document.createElement('tr');
+        const cell = (id, max, label) => `<td><input class="input" type="number" id="${id}" min="1" max="${max}" placeholder="auto" aria-label="${names[key]} ${label}"></td>`;
+        tr.innerHTML = `<td>${names[key]}</td>${cell(`cfg-${key}-maxsol`, 20000, 'max solutions')}${cell(`cfg-${key}-maxlen`, 20, 'move depth')}${cell(`cfg-${key}-pseudo-maxsol`, 20000, 'pseudo max solutions')}${cell(`cfg-${key}-pseudo-maxlen`, 20, 'pseudo move depth')}`;
+        body.appendChild(tr);
+    }
+}
+
+function restoreSearchConfigInputs(searchConfig) {
+    if (!searchConfig) return;
+    const writePair = (idPrefix, override) => {
+        if (!override) return;
+        const maxSolEl = document.getElementById(`${idPrefix}-maxsol`);
+        const maxLenEl = document.getElementById(`${idPrefix}-maxlen`);
+        if (maxSolEl && override.maxSolutions) maxSolEl.value = override.maxSolutions;
+        if (maxLenEl && override.maxLength) maxLenEl.value = override.maxLength;
+    };
+
+    for (const key of SEARCH_CONFIG_CATEGORIES) {
+        writePair(`cfg-${key}`, searchConfig[key]);
+        writePair(`cfg-${key}-pseudo`, searchConfig[`${key}Pseudo`]);
+    }
+}
+
+function persistAndNavigate() {
+    const textareaNode = document.getElementById('scramble-input');
+    const rawContent = textareaNode?.value.trim();
+
+    const scrambles = rawContent
+        ? rawContent.split('\n').map(line => line.trim()).filter(Boolean)
+        : [typeof generateRandomStateScramble === 'function' ? generateRandomStateScramble() : generateScramble()];
+
+    const getCheckedValues = (selector) =>
+        Array.from(document.querySelectorAll(selector), cb => cb.value);
+
+    const searchCriteria = {
+        colors: getCheckedValues('#colors-group input[type="checkbox"]:checked'),
+        advanced: getCheckedValues('#advanced-group input[type="checkbox"]:checked'),
+        // Per-category overrides;
+        // undefined when every per-category field was left blank.
+        searchConfig: readSearchConfig(),
+        scrambles
+    };
+
+    localStorage.setItem(scopedKey(STORAGE_KEY), JSON.stringify(normalizeCriteria({ ...searchCriteria, version: CRITERIA_VERSION })));
+    window.location.href = 'solver.html';
+}
+
+function restoreCheckboxState() {
+    const rawState = localStorage.getItem(scopedKey(STORAGE_KEY));
+    if (!rawState) return;
+
+    const { colors = [], advanced = [], searchConfig } = normalizeCriteria(JSON.parse(rawState));
+    restoreSearchConfigInputs(searchConfig);
+
+    const checkMatching = (selector, values) => {
+        document.querySelectorAll(selector).forEach(cb => {
+            cb.checked = values.includes(cb.value);
+        });
+    };
+
+    // no colour saved: the search uses white (solver-ui.js getCheckedColors), and so does the form
+    checkMatching('#colors-group input[type="checkbox"]', colors.length ? colors : ['white']);
+    checkMatching('#advanced-group input[type="checkbox"]', advanced);
+}
+
+function normalizeCriteria(criteria) {
+    const advanced = (criteria.advanced || []).filter(o => !RETIRED_OPTIONS.includes(o) && !ALWAYS_ON_OPTIONS.includes(o));
+    const out = { ...criteria, advanced: [...advanced, ...ALWAYS_ON_OPTIONS] };
+    const legacy = {};
+    if ((criteria.advanced || []).includes('simplified_pseudo')) legacy.simplePseudo = true;
+    if ((criteria.advanced || []).includes('multislotting')) legacy.multislot = true;
+    delete out.maxSolutions;
+    delete out.timeLimit;
+    if (criteria.lookaheadDepth > 1) legacy.lookaheadDepth = criteria.lookaheadDepth;
+    if (criteria.lookaheadBreadth) legacy.lookaheadBreadth = criteria.lookaheadBreadth;
+    delete out.lookaheadDepth;
+    delete out.lookaheadBreadth;
+    if (Object.keys(legacy).length) out.legacyView = legacy;
+    return out;
+}
+
+function loadSearchCriteria() {
+    const rawState = localStorage.getItem(scopedKey(STORAGE_KEY));
+    return rawState ? normalizeCriteria(JSON.parse(rawState)) : null;
+}
+
+function criteriaFromProfile(saved) {
+    const p = typeof cubeProfiles !== 'undefined' && cubeProfiles ? cubeProfiles.active() : null;
+    if (!p || typeof settingsFromAnswers !== 'function') return null;
+    const settings = settingsFromAnswers(p.answers);
+    const scramble = typeof generateRandomStateScramble === 'function' ? generateRandomStateScramble() : generateScramble();
+    const criteria = normalizeCriteria({
+        colors: (saved && saved.colors && saved.colors.length) ? saved.colors : settings.colors,
+        advanced: (saved && saved.advanced) || settings.advanced,
+        searchConfig: saved ? saved.searchConfig : undefined,
+        scrambles: [scramble],
+        version: CRITERIA_VERSION,
+    });
+    try { localStorage.setItem(scopedKey(STORAGE_KEY), JSON.stringify(criteria)); } catch (err) { /* private mode: this visit only */ }
+    return criteria;
+}
+
+function installInfoDialog() {
+    const button = document.getElementById('info-btn');
+    if (!button || typeof document.createElement('dialog').showModal !== 'function') {
+        if (button) button.hidden = true;
+        return;
+    }
+    const dialog = document.createElement('dialog');
+    dialog.className = 'info-dialog popup';
+    dialog.setAttribute('aria-label', 'about');
+    const keys = typeof INFO_SECTION_KEYS !== 'undefined' ? INFO_SECTION_KEYS : [];
+    dialog.innerHTML = `<div class="popup-head"><h2>Help</h2><button type="button" class="close-x close-btn" aria-label="close">&times;</button></div><div class="info-body"></div>`;
+    const body = dialog.querySelector('.info-body');
+    for (const k of keys) {
+        const h = document.createElement('h3');
+        h.textContent = caption(`info.${k}.title`);
+        const p = document.createElement('p');
+        p.textContent = caption(`info.${k}.text`);
+        p.dataset.caption = `info.${k}.text`;
+        body.append(h, p);
+    }
+    document.body.appendChild(dialog);
+    button.addEventListener('click', () => dialog.showModal());
+    dialog.querySelector('.close-btn').addEventListener('click', () => dialog.close());
+    // A click on the backdrop (outside the dialog box) closes it.
+    dialog.addEventListener('click', (e) => {
+        const r = dialog.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialog.close();
+    });
+}
+
+const scrambleController = {
+    sequenceList: [],
+    activeIndex: 0,
+
+    init(scrambles = []) {
+        if (!document.getElementById('scramble-display')) return;
+
+        this.sequenceList = scrambles.length ? scrambles : [generateScramble()];
+        this.activeIndex = 0;
+        this.render();
+    },
+
+    render() {
+        const indexNode = document.getElementById('current-scramble-num');
+        const displayNode = document.getElementById('scramble-display');
+
+        if (indexNode) {
+            indexNode.value = this.activeIndex + 1;
+            indexNode.max = this.sequenceList.length;
+        }
+        if (displayNode) {
+            displayNode.textContent = this.sequenceList[this.activeIndex] ?? '';
+        }
+        const countNode = document.getElementById('scramble-pos');
+        if (countNode) countNode.textContent = `${this.activeIndex + 1}/${this.sequenceList.length}`;
+
+        if (typeof window.onActiveScrambleChanged === 'function') {
+            window.onActiveScrambleChanged(this.activeIndex, this.sequenceList[this.activeIndex]);
+        }
+    },
+
+    navigate(offset) {
+        const targetIndex = this.activeIndex + offset;
+        if (targetIndex < 0 || targetIndex >= this.sequenceList.length) return;
+
+        this.activeIndex = targetIndex;
+        this.render();
+    },
+
+    jumpTo(rawInput) {
+        const parsedTarget = parseInt(rawInput, 10);
+        if (Number.isNaN(parsedTarget)) {
+            this.render();
+            return;
+        }
+
+        const boundedIndex = Math.max(1, Math.min(parsedTarget, this.sequenceList.length));
+        this.activeIndex = boundedIndex - 1;
+        this.render();
+    }
+};
+
+function pruneGraph(tree, criteria) {
+    const { advanced } = criteria;
+    const isPseudoOn = advanced.includes("full_pseudo");
+    const isXcrossOn = advanced.includes("xcross");
+    const isXxcrossOn = advanced.includes("xxcross");
+    const isXxxcrossOn = advanced.includes("xxxcross");
+    const isMultislottingOn = advanced.includes("multislotting");
+    const isSimplifiedPseudoOn = advanced.includes("simplified_pseudo");
+
+    const isNonPseudo = ({ corners, edges }) => {
+        if (!corners.length && !edges.length) return true;
+        if (corners.length !== edges.length) return false;
+
+        const sortedCorners = [...corners].sort();
+        const sortedEdges = [...edges].sort();
+
+        return sortedCorners.every((corner, idx) => corner === sortedEdges[idx]);
+    };
+
+    const validNodes = tree.nodes.filter(node => isPseudoOn || isNonPseudo(node.state));
+    const validNodeIds = new Set(validNodes.map(node => node.id));
+    const nodeMap = new Map(validNodes.map(node => [node.id, node]));
+
+    const unsolvedNode = validNodes.find(n => n.state.cross_solved === false);
+    const unsolvedNodeId = unsolvedNode?.id ?? "N0";
+
+    const validEdges = tree.edges.filter(edge => {
+        if (!validNodeIds.has(edge.source) || !validNodeIds.has(edge.target)) return false;
+
+        // Simplified pseudo: out of a mismatched node, only the direct repair
+        // of that mismatch survives (tree_gen.py flags everything else).
+        if (isSimplifiedPseudoOn && edge.full_pseudo_only) return false;
+
+        const isFromRoot = edge.source === unsolvedNodeId;
+
+        if (isFromRoot) {
+            const pairsSolved = nodeMap.get(edge.target).state.corners.length;
+            if (!isXcrossOn && pairsSolved === 1) return false;
+            if (!isXxcrossOn && pairsSolved === 2) return false;
+            if (!isXxxcrossOn && pairsSolved === 3) return false;
+        }
+
+        if (!isMultislottingOn && !isFromRoot) {
+            const cornersSolved = edge.solved_step?.corners?.length ?? 0;
+            const edgesSolved = edge.solved_step?.edges?.length ?? 0;
+
+            if (cornersSolved > 1 || edgesSolved > 1) return false;
+        }
+
+        return true;
+    });
+
+    return { nodes: validNodes, edges: validEdges };
+}
+
+function altAlgs(algorithms) {
+    const FACE_MAP = {
+        R: 'F', L: 'B', U: 'U', D: 'D', F: 'L', B: 'R',
+        r: 'f', l: 'b', u: 'u', d: 'd', f: 'l', b: 'r',
+        E: 'E',
+        M: { '': "S'", "'": 'S', '2': 'S2' },
+        S: { '': 'M', "'": "M'", '2': 'M2' }
+    };
+
+    const ROTATIONS = ['', 'y', 'y2', "y'"];
+
+    const rotateMove = (move) => {
+        const base = move.replace(/['2]$/, '');
+        const modifier = move.slice(base.length);
+
+        if (base === 'M' || base === 'S') return FACE_MAP[base][modifier];
+
+        return FACE_MAP[base] ? FACE_MAP[base] + modifier : move;
+    };
+
+    const rotateAlg = (alg) =>
+        alg.trim().split(/\s+/).map(rotateMove).join(' ');
+
+    return algorithms.flatMap(original => {
+        let currentAlg = original.trim();
+
+        return ROTATIONS.map(prefix => {
+            const formatted = prefix ? `${prefix} ${currentAlg}` : currentAlg;
+            currentAlg = rotateAlg(currentAlg);
+            return formatted;
+        });
+    });
+}
+
+const ALG_SPEED_DEFAULTS = { wristMult: 0.836, pushMult: 1.2, ringMult: 1.72, destabilize: 0.245, addRegrip: 0.25, double: 3.23, sesliceMult: 1.25, overWorkMult: 0.395, moveblock: 0.28, rotation: 4.8 };
+
+const STEP_PENALTIES = { D: 0, F: 2.41, B: 3.5, wideRL: 2.3, wideUDFB: 3.02, wideOther: 3.31, rotMidY: 0, natural: 1.68 };
+
+const PLANNING_OFF_SCORING = {
+    mcc: { ...ALG_SPEED_DEFAULTS },
+    pen: { ...STEP_PENALTIES },
+};
+const DEFAULT_SCORING = { mcc: ALG_SPEED_DEFAULTS, pen: STEP_PENALTIES };
+function scoringFor(settings) {
+    return settings && settings.planning === false ? PLANNING_OFF_SCORING : DEFAULT_SCORING;
+}
+
+function stepPenalty(alg, P = STEP_PENALTIES) {
+    let total = 0;
+    // (A plain loop: this runs for every candidate of every search.)
+    const text = String(alg || '');
+    // Plain single spaces (every generated alg) split without a regex.
+    const tokens = /[^\S ]/.test(text) ? text.split(/\s+/) : text.split(' ');
+    let i = 0;
+    for (const t of tokens) {
+        if (!t) continue;
+        const c = t[0];
+        if (c === 'D') total += P.D;
+        else if (c === 'F') total += P.F;
+        else if (c === 'B') total += P.B;
+        else if (c === 'r' || c === 'l') total += P.wideRL;
+        else if (c === 'u' || c === 'd' || c === 'f' || c === 'b') total += P.wideUDFB;
+        else if (c === 'M' || c === 'E' || c === 'S') total += P.wideOther;
+        else if (c === 'y' && i > 0) total += P.rotMidY;
+        i++;
+    }
+    if (i && P.natural) total += P.natural * algSurprise(tokens);
+    return total;
+}
+
+// Standard human F2L algorithms (front-right slot unless noted), one per line;
+// left-right mirrors are added by code. Lines starting with # are headings.
+const HUMAN_F2L_ALGS = `
+# --- basic inserts and triggers
+R U R'
+R U' R'
+R U2 R'
+R' U R
+R' U' R
+R' U2 R
+F' U' F
+F' U F
+F' U2 F
+F U F'
+F U' F'
+U R U' R'
+U' R U R'
+U R U R'
+U' R U' R'
+U' F' U F
+U F' U' F
+U R U2 R'
+U' R U2 R'
+R U R' U' R U R'
+R U' R' U R U' R'
+R U R' U' R U R' U' R U R'
+R' F R F'
+F R' F' R
+R U R' U'
+R' F' R
+r U' r'
+r U r'
+r U2 r'
+r' U' r
+r' U r
+d R' U R
+d R' U' R
+d R' U2 R
+y' U' R' U R
+y' U R' U' R
+y' R' U' R
+y' R' U R
+y U' L' U L
+y U L' U' L
+y L' U' L
+d' L' U L
+R U R' F R' F' R
+R U' R' F R' F' R
+# --- the 41 cases, FR slot (with common alternatives)
+U R U' R'
+y' U' R' U R
+U' F' U F
+y' R' U' R
+F' U' F
+R U R'
+U' R U R' U2 R U' R'
+y' U R' U' R U2 R' U R
+U F' U' F U2 F' U F
+U' R U2 R' U2 R U' R'
+y' U R' U2 R U2 R' U R
+d R' U2 R U2 R' U R
+U' R U' R' U F' U' F
+U' R U R' U R U R'
+U' R U2 R' U F' U' F
+R U' R' U R U' R' U2 R U' R'
+R U R' U2 R U' R' U R U' R'
+y' R' U2 R U R' U' R
+y' U R' U R U' R' U' R
+d R' U R U' R' U' R
+U' R U' R' U R U R'
+R' D' R U' R' D R U R U' R'
+y' R' U R U2 R' U R
+R U' R' U2 F' U' F
+R U2 R' U' R U R'
+y' R' U2 R U R' U' R
+U R U2 R' U R U' R'
+y' U' R' U2 R U' R' U R
+U2 R U R' U R U' R'
+y' U2 R' U' R U' R' U R
+r U' r' U2 r U r'
+U R U' R' U' R U' R' U R U' R'
+U2 R2 U2 R' U' R U' R2
+F U R U' R' F' R U' R'
+U F R' F' R U R U' R'
+U' R' F R F' R U' R'
+U' F' R U R' U' R' F R
+U R U' R' U' F' U F
+R U' R' U R U' R'
+R U R' U' F R' F' R
+R U R' U' R U R'
+R U' R' U' R U R' U2 R U' R'
+R' F R F' R U' R' U R U' R'
+R U' R' d R' U R
+R U R' U' R U R' U' R U R'
+U' R U' R' U2 R U' R'
+U R U R' U2 R U R'
+U' R U R' d R' U' R
+U F' U F U' F' U' F
+R2 U2 F R2 F' U2 R' U R'
+R U' R' U' R U R' U2 R U' R'
+R U' R' U R U2 R' U R U' R'
+R U' R' F' L' U2 L F
+R U2 R U R' U R U2 R2
+R U' R' r U' r' U2 r U r'
+R2 U2 R' U' R U' R' U2 R'
+R U R' U2 R U2 R' U R U' R'
+R U2 R' U R U2 R' U F' U' F
+# --- more common alternatives
+U' R U' R' U R U R'
+U R U' R' U R U' R' U R U' R'
+U' R U R' U R U R'
+R U R' U2 R U R' U' R U R'
+U R' F R F' U R U' R'
+U2 R U R' U F' U' F
+R' F' R U R U' R' F
+U' R' U2 R U R' U R
+F U2 F' U' R U R'
+R' U2 R2 U R2 U R
+R U2 R2 F R F'
+R2 U R2 U R2 U2 R2
+y' U2 R' U R U' R' U' R
+y' U R' U R U' R' U' R
+d R' U' R U2 R' U R
+y' U' R' U R U R' U R
+R U' R2 F R F'
+U2 R U' R' U' F' U' F
+F' U F U2 R U R'
+U' F' U F U R U R'
+R U' R' U F' U F
+D R U' R' D'
+D' R U R' D
+D R U R' D'
+D' R U' R' D
+D R U2 R' D'
+D' R U2 R' D
+# --- back-right slot without rotation
+R' U R U' R' U R
+R' U' R U R' U' R
+U R' U R
+U' R' U' R
+U R' U' R U2 R' U R
+U' R' U2 R U2 R' U R
+R' U2 R U R' U' R
+U R' U2 R U' R' U R
+U2 R' U' R U' R' U R
+U' R' U R U' R' U' R
+R' U' R U2 R' U R
+U R' U R U' R' U' R
+R' U R U2 R' U' R
+B U B'
+B' U B
+B' U' B
+U' B U' B'
+U B' U B
+R' U R U2 R' U R
+r' U r U2 r' U r
+# --- front-left / back-left slot without rotation (written out, besides generated mirrors)
+L' U' L
+L' U L
+U' L' U L
+U L' U' L
+L U L'
+L U' L'
+U L U' L'
+U' L U L'
+L' U2 L U L' U' L
+U L' U2 L U' L' U L
+L U2 L' U' L U L'
+# --- keyhole / multislot style
+D R U R' D'
+D' R U' R' D
+R U' R' D R U R' D'
+F' U F U' R U R'
+R U R' F' U' F
+U' R' F R F'
+F R U R' U' F'
+F' U' F R U R'
+`;
+
+function proStepAlgs() {
+    return typeof PRO_STEP_ALGS !== 'undefined' ? PRO_STEP_ALGS : require('./pro-steps.js').PRO_STEP_ALGS;
+}
+
+const NATURALNESS = { order: 3, discount: 0.95, floor: 0.02, proWeight: 3 };
+
+// Every move token (faces, wide turns, slices, rotations; plain, ' and 2) and the end token.
+const NATURAL_VOCAB = [...'UDFBRLudfbrlMESxyz'].flatMap(f => [f, `${f}'`, `${f}2`]).concat('</s>');
+const NATURAL_VOCAB_SIZE = NATURAL_VOCAB.length;
+
+function naturalTokens(alg) {
+    const raw = Array.isArray(alg) ? alg : String(alg || '').split(/\s+/);
+    const out = [];
+    for (const t of raw) {
+        if (!t) continue;
+        const c = t[0];
+        out.push(t.length === 3 && t[1] === '2' ? t.slice(0, 2) : t === `${c}'2` ? `${c}2` : t);
+    }
+    return out;
+}
+
+function mirrorMove(t) {
+    const c = t[0];
+    const face = { R: 'L', L: 'R', r: 'l', l: 'r' }[c] || c;
+    if (c === 'x' || c === 'M') return t;
+    const suffix = t.slice(1);
+    return face + (suffix === '2' ? '2' : suffix === "'" ? '' : "'");
+}
+
+function buildNaturalnessModel({ excludeSolve = 0, proWeight = NATURALNESS.proWeight, proSteps = null, order = NATURALNESS.order, discount = NATURALNESS.discount, corpus = null } = {}) {
+    const { floor } = NATURALNESS;
+    const D = discount;
+    let algs;
+    if (corpus) algs = corpus.slice();
+    else {
+        algs = HUMAN_F2L_ALGS.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+        (proSteps || proStepAlgs()).forEach((steps, k) => {
+            if (k + 1 === excludeSolve) return;
+            for (let n = 0; n < proWeight; n++) algs.push(...steps);
+        });
+    }
+    // counts[n]: context (n previous tokens, space-joined) -> Map(token -> count);
+    // the highest order holds raw counts, lower orders Kneser-Ney continuation counts.
+    const counts = Array.from({ length: order }, () => new Map());
+    const add = (m, ctx, w) => {
+        let c = m.get(ctx);
+        if (!c) m.set(ctx, (c = new Map()));
+        c.set(w, (c.get(w) || 0) + 1);
+    };
+    const start = Array(order - 1).fill('<s>');
+    for (const alg of algs) {
+        const toks = naturalTokens(alg);
+        for (const seq of [toks, toks.map(mirrorMove)]) {
+            const s = [...start, ...seq, '</s>'];
+            for (let i = order - 1; i < s.length; i++) add(counts[order - 1], s.slice(i - order + 1, i).join(' '), s[i]);
+        }
+    }
+    for (let n = order - 2; n >= 0; n--) {
+        const seen = new Set();
+        for (const [ctx, ws] of counts[n + 1]) {
+            const lower = ctx.split(' ').slice(1).join(' ');
+            for (const w of ws.keys()) {
+                const key = `${lower}\u0001${w}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                add(counts[n], lower, w);
+            }
+        }
+    }
+    const totals = counts.map(m => new Map([...m].map(([ctx, ws]) => [ctx, [...ws.values()].reduce((a, b) => a + b, 0)])));
+    function bits(ctx, w) {
+        let p = 1 / NATURAL_VOCAB_SIZE;
+        for (let n = 0; n < order; n++) {
+            const cx = n === 0 ? '' : ctx.slice(ctx.length - n).join(' ');
+            const c = counts[n].get(cx);
+            if (!c) continue;
+            const tot = totals[n].get(cx);
+            p = Math.max((c.get(w) || 0) - D, 0) / tot + (D * c.size / tot) * p;
+        }
+        return -Math.log2((1 - floor) * p + floor / NATURAL_VOCAB_SIZE);
+    }
+    const fast = order === 3;
+    const ids = new Map(NATURAL_VOCAB.map((t, i) => [t, i]));
+    const V = NATURAL_VOCAB.length; // ids 0..V-1; V = '<s>'
+    const table = fast ? new Float64Array((V + 1) * (V + 1) * V).fill(-1) : null;
+    const names = [...NATURAL_VOCAB, '<s>'];
+    const END = ids.get('</s>');
+    function surprise(alg) {
+        const toks = naturalTokens(alg);
+        if (!toks.length) return 0;
+        if (fast) {
+            let a = V, b = V, total = 0;
+            for (let i = 0; i <= toks.length; i++) {
+                const w = i < toks.length ? ids.get(toks[i]) : END;
+                if (w === undefined) return slowSurprise(toks);
+                const k = (a * (V + 1) + b) * V + w;
+                let x = table[k];
+                if (x < 0) x = table[k] = bits([names[a], names[b]], names[w]);
+                total += x;
+                a = b;
+                b = w;
+            }
+            return total;
+        }
+        return slowSurprise(toks);
+    }
+    function slowSurprise(toks) {
+        const s = [...start, ...toks, '</s>'];
+        let total = 0;
+        for (let i = order - 1; i < s.length; i++) total += bits(s.slice(i - order + 1, i), s[i]);
+        return total;
+    }
+    function trigramBits(a, b, w) {
+        const k = (a * (V + 1) + b) * V + w;
+        let x = table[k];
+        if (x < 0) x = table[k] = bits([names[a], names[b]], names[w]);
+        return x;
+    }
+    const incremental = fast ? { trigramBits, tokenId: t => ids.get(t), START: V, END } : null;
+    return { surprise, bits, algs: algs.length, incremental };
+}
+
+let f2lCorpusCache = null;
+function f2lCorpusAlgs() {
+    if (!f2lCorpusCache) {
+        const set = new Set();
+        const add = (alg) => {
+            const toks = naturalTokens(alg);
+            if (toks.length) for (const seq of [toks, toks.map(mirrorMove)]) set.add(seq.join(' '));
+        };
+        HUMAN_F2L_ALGS.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#')).forEach(add);
+        for (const steps of proStepAlgs()) steps.slice(1).forEach(add);
+        f2lCorpusCache = [...set];
+    }
+    return f2lCorpusCache;
+}
+
+const PAIR_CHOICE_LOOK = [0.54, 0.78, 0.45, -1.43, -5.66];
+const PAIR_PLANNING = { look: [0.4, -0.8, 0.24, -1.4, -5.58], plan: [0.6, -1.59, 0.78, 2.54] };
+
+let naturalnessModel = null;
+function algSurprise(alg) {
+    if (!naturalnessModel) naturalnessModel = buildNaturalnessModel();
+    return naturalnessModel.surprise(alg);
+}
+function currentNaturalnessModel() {
+    if (!naturalnessModel) naturalnessModel = buildNaturalnessModel();
+    return naturalnessModel;
+}
+function useNaturalnessModel(model) {
+    naturalnessModel = model;
+}
+
+const MCC_UPPER = new Map();
+function mccUpper(t) {
+    let u = MCC_UPPER.get(t);
+    if (u === undefined) {
+        u = Object.keys({ [t.toUpperCase()]: 0 })[0];
+        if (MCC_UPPER.size < 4096) MCC_UPPER.set(t, u);
+    }
+    return u;
+}
+
+function algSpeed(sequence, ignoreErrors = false, ignoreauf = false, wristMult = ALG_SPEED_DEFAULTS.wristMult, pushMult = ALG_SPEED_DEFAULTS.pushMult, ringMult = ALG_SPEED_DEFAULTS.ringMult, destabilize = ALG_SPEED_DEFAULTS.destabilize, addRegrip = ALG_SPEED_DEFAULTS.addRegrip, double = ALG_SPEED_DEFAULTS.double, sesliceMult = ALG_SPEED_DEFAULTS.sesliceMult, overWorkMult = ALG_SPEED_DEFAULTS.overWorkMult, moveblock = ALG_SPEED_DEFAULTS.moveblock, rotation = ALG_SPEED_DEFAULTS.rotation, resume = null, stopAt = undefined) {
+    function test(splitSeq, upperSeq, lGrip, rGrip, speed) {
+        let lThumb = [-1, "home"];
+        let lIndex = [-1, "home"];
+        let lMiddle = [-1, "home"];
+        let lRing = [-1, "home"];
+        let rThumb = [-1, "home"];
+        let rIndex = [-1, "home"];
+        let rMiddle = [-1, "home"];
+        let rRing = [-1, "home"];
+        let lOhCool = -1;
+        let rOhCool = -1;
+        let lWrist = lGrip;
+        let rWrist = rGrip;
+        let grip = 1;
+        let udgrip = -1;
+        let prevSpeed = null;
+        let firstMoveSpeed = null;
+
+        function overwork(finger, locationPrefer, penalty = overWorkMult) {
+            if (finger[1] != locationPrefer) {
+                if (speed - finger[0] < penalty) {
+                    return penalty - speed + finger[0]
+                }
+            }
+            return 0
+        }
+        for (let j = 0; j < splitSeq.length; j++) {
+            let move = splitSeq[j];
+            let normalMove = upperSeq[j];
+            let prevMove = j == 0 ? " " : upperSeq[j - 1];
+            if (prevSpeed !== null) {
+                firstMoveSpeed = speed
+                speed = prevSpeed
+            }
+            if (j < splitSeq.length - 1) {
+                if ((move[0] == "U" && splitSeq[j + 1][0] == "D") || (move[0] == "D" && splitSeq[j + 1][0] == "U")) {
+                    prevSpeed = speed;
+                }
+            }
+            switch (normalMove) {
+                case "R'":
+                    if (rWrist == 2) { rWrist = 0 } else if (rWrist > -1 && !(lWrist >= 1 && rWrist <= 0)) { rWrist-- } else { return [j, speed, lWrist, rWrist - 1, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])] }
+                    speed += wristMult;
+                    break;
+                case "R":
+                    if (rWrist < 2 && !(lWrist <= -1 && rWrist >= 0)) { rWrist++ } else { return [j, speed, lWrist, rWrist + 1, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])] }
+                    speed += wristMult;
+                    break;
+                case "R2":
+                    if (rWrist >= 1 && lWrist < 1) { rWrist = -1 } else if (lWrist > -1) { rWrist += 2 } else { return [j, speed, lWrist, (rWrist > 0) ? rWrist - 2 : rWrist + 2, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])] }
+                    speed += double * wristMult;
+                    break;
+                case "U":
+                    if (rWrist == 0 && (rThumb[0] + overWorkMult <= speed || rThumb[1] != "top") && rIndex[1] != "m") {
+                        if (overwork(rIndex, "home") <= overwork(rMiddle, "home")) {
+                            speed += overwork(rIndex, "home");
+                            speed++;
+                            rIndex = [speed, "uflick"];
+                        } else {
+                            speed += overwork(rMiddle, "home");
+                            speed++;
+                            rIndex = [speed, "uflick"];
+                            rMiddle = [speed, "uflick"];
+                        }
+                    } else if (rWrist == 1 && lWrist == 0) {
+                        speed += overwork(lIndex, "uflick");
+                        if (prevMove == "B'") { speed += moveblock + pushMult } else if (prevMove[0] == "B'") { speed += moveblock * 0.5 + pushMult } else { speed += pushMult }
+                        lIndex = [speed, "home"];
+                    } else if (lWrist == 0 && prevMove[0] != "F" && prevMove[0] != "B") {
+                        if (lIndex[1] == "uflick") {
+                            speed += overwork(lIndex, "eido", 0.75 * overWorkMult);
+                            speed = Math.max(speed, lOhCool + 2.5);
+                        } else {
+                            speed += overwork(lIndex, "eido", 1.25 * overWorkMult);
+                        }
+                        speed += 1.15 * pushMult;
+                        lIndex = [speed, "uflick"];
+                        lOhCool = speed;
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "U'":
+                    if (lWrist == 0 && (lThumb[0] + overWorkMult <= speed || lThumb[1] != "top") && lIndex[1] != "m") {
+                        if (overwork(lIndex, "home") <= overwork(lMiddle, "home")) {
+                            speed += overwork(lIndex, "home");
+                            speed++;
+                            lIndex = [speed, "uflick"];
+                        } else {
+                            speed += overwork(lMiddle, "home");
+                            speed++;
+                            lIndex = [speed, "uflick"];
+                            lMiddle = [speed, "uflick"];
+                        }
+                    } else if (lWrist == 1 && rWrist == 0) {
+                        speed += overwork(rIndex, "uflick");
+                        if (prevMove == "B") { speed += moveblock + pushMult } else if (prevMove[0] == "B'") { speed += moveblock * 0.5 + pushMult } else { speed += pushMult }
+                        rIndex = [speed, "home"];
+                    } else if (rWrist == 0 && prevMove[0] != "F" && prevMove[0] != "B") {
+                        if (rIndex[1] == "uflick") {
+                            speed += overwork(rIndex, "eido", 0.75 * overWorkMult);
+                            speed = Math.max(speed, rOhCool + 2.5);
+                        } else {
+                            speed += overwork(rIndex, "eido", 1.25 * overWorkMult);
+                        }
+                        speed += 1.15 * pushMult;
+                        rIndex = [speed, "uflick"];
+                        rOhCool = speed;
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "U2":
+                    if (rWrist == 0 && (lIndex[1] == "m" || lWrist != 0 || (Math.max(overwork(rIndex, "home"), overwork(rMiddle, "home"), overwork(rRing, "u2grip")) <= Math.max(overwork(lIndex, "home"), overwork(lMiddle, "home"), overwork(lRing, "u2grip"))))) {
+                        speed += overwork(rIndex, "home");
+                        speed += overwork(rMiddle, "home");
+                        speed += overwork(rRing, "u2grip", moveblock * overWorkMult);
+                        speed += double;
+                        rIndex = [speed, "uflick"];
+                        rMiddle = [speed, "uflick"];
+                    } else if (lWrist == 0) {
+                        speed += overwork(lIndex, "home");
+                        speed += overwork(lMiddle, "home");
+                        speed += overwork(lRing, "u2grip", moveblock * overWorkMult);
+                        speed += double;
+                        lIndex = [speed, "uflick"];
+                        lMiddle = [speed, "uflick"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "D":
+                    if (lWrist == 0 && (rWrist != 0 || (Math.max(overwork(lRing, "home"), overwork(lMiddle, "home")) <= Math.max(overwork(rRing, "dflick"), overwork(rMiddle, "home"))))) {
+                        speed += overwork(lRing, "home");
+                        speed += overwork(lMiddle, "home");
+                        if (prevMove[0] == "B") { speed += moveblock * 0.5 + ringMult } else { speed += ringMult }
+                        lRing = [speed, "dflick"];
+                    } else if (rWrist == 0 && prevMove[0] != "B") {
+                        speed += overwork(rRing, "dflick");
+                        speed += overwork(rMiddle, "home");
+                        speed += ringMult * pushMult;
+                        rRing = [speed, "home"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "D'":
+                    if (rWrist == 0 && (lWrist != 0 || (Math.max(overwork(rRing, "home"), overwork(rMiddle, "home")) <= Math.max(overwork(lRing, "dflick"), overwork(lMiddle, "home"))))) {
+                        speed += overwork(rRing, "home");
+                        speed += overwork(rMiddle, "home");
+                        if (prevMove[0] == "B") { speed += moveblock * 0.5 + ringMult } else { speed += ringMult }
+                        rRing = [speed, "dflick"]
+                    } else if (lWrist == 0 && prevMove[0] != "B") {
+                        speed += overwork(lRing, "dflick");
+                        speed += overwork(lMiddle, "home");
+                        speed += ringMult * pushMult;
+                        lRing = [speed, "home"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "D2":
+                    if (rWrist == 0 && (lWrist != 0 || (Math.max(overwork(rMiddle, "home"), overwork(rRing, "home")) <= Math.max(overwork(lMiddle, "home"), overwork(lRing, "home"))))) {
+                        speed += overwork(rMiddle, "home");
+                        speed += overwork(rRing, "home");
+                        if (prevMove[0] == "B") { speed += moveblock * 0.5 + double * ringMult } else { speed += double * ringMult }
+                        rRing = [speed, "dflick"]
+                    } else if (lWrist == 0) {
+                        speed += overwork(lMiddle, "home");
+                        speed += overwork(lRing, "home");
+                        if (prevMove[0] == "B") { speed += moveblock * 0.5 + double * ringMult } else { speed += double * ringMult }
+                        lRing = [speed, "dflick"]
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "F":
+                    if (rWrist == -1) {
+                        speed += overwork(rIndex, "home");
+                        speed += 1;
+                        rIndex = [speed, "uflick"]
+                    } else if (lWrist == 1 && move != "f") {
+                        speed += overwork(lRing, "home");
+                        if (prevMove[0] == "D") { speed += moveblock * 0.5 + ringMult } else { speed += 1 }
+                        lRing = [speed, "dflick"];
+                    } else if (rWrist == 1 && prevMove[0] != "D" && move != "f") {
+                        speed += overwork(rRing, "dflick");
+                        speed += ringMult * pushMult;
+                        rRing = [speed, "home"]
+                    } else if (lWrist == -1 && rWrist == 0 && overwork(rIndex, "uflick") == 0) {
+                        speed += 1;
+                        rIndex = [speed, "fflick"];
+                    } else if (lWrist == -1 && overwork(lIndex, "uflick") == 0 && prevMove[0] != "U") {
+                        speed += pushMult;
+                        lIndex = [speed, "home"]
+                    } else if (lWrist == -1 && grip == -1) {
+                        speed += overwork(lThumb, "top", 0.9 * overWorkMult)
+                        speed += overwork(lIndex, "top");
+                        if (prevMove[0] == "D") { speed += 1.8 } else { speed += 1 };
+                        lWrist++;
+                        lThumb = [speed, "leftu"];
+                        lIndex = [speed, "top"];
+                    } else if (lWrist == 0 && grip == -1) {
+                        speed += overwork(lThumb, "bottom");
+                        speed += overwork(lIndex, "top");
+                        if (prevMove[0] == "D") { speed += 2.05 } else { speed += 1.25 };
+                        lThumb = [speed, "top"]
+                        lIndex = [speed, "top"]
+                    } else if (rWrist == 0 && lWrist == 0 && move == "f") {
+                        speed += overwork(rIndex, "uflick");
+                        speed += overwork(rMiddle, "home");
+                        speed += 1;
+                        rIndex = [speed, "fflick"];
+                    } else if (j == 0 && rWrist == 0 && lWrist == 0) {
+                        speed += overwork(rThumb, "top");
+                        speed += 1;
+                        rThumb = [speed, "rdown"];
+                        rMiddle = [speed, "uflick"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "F'":
+                    if (lWrist == -1) {
+                        speed += overwork(lIndex, "home");
+                        speed += 1;
+                        lIndex = [speed, "uflick"]
+                    } else if (rWrist == 1 && move != "f") {
+                        speed += overwork(rRing, "home");
+                        if (prevMove[0] == "D") { speed += moveblock * 0.5 + ringMult } else { speed += 1 }
+                        rRing = [speed, "dflick"];
+                    } else if (lWrist == 1 && prevMove[0] != "D" && move != "f") {
+                        speed += overwork(lRing, "dflick");
+                        speed += ringMult * pushMult;
+                        lRing = [speed, "home"]
+                    } else if (rWrist == -1 && lWrist == 0 && overwork(lIndex, "uflick") == 0) {
+                        speed += 1;
+                        lIndex = [speed, "fflick"];
+                    } else if (rWrist == -1 && overwork(rIndex, "uflick") == 0 && prevMove[0] != "U") {
+                        speed += pushMult;
+                        rIndex = [speed, "home"]
+                    } else if (rWrist == -1 && grip == 1) {
+                        speed += overwork(rThumb, "top", 0.9 * overWorkMult)
+                        speed += overwork(rIndex, "top");
+                        if (prevMove[0] == "D") { speed += 1.8 } else { speed += 1 };
+                        rWrist++;
+                        rThumb = [speed, "rightu"];
+                        rIndex = [speed, "top"]
+                    } else if (rWrist == 0 && grip == 1) {
+                        speed += overwork(rThumb, "bottom")
+                        speed += overwork(rIndex, "top");
+                        if (prevMove[0] == "D") { speed += 2.05 } else { speed += 1.25 };
+                        rThumb = [speed, "top"]
+                        rIndex = [speed, "top"]
+                    } else if (lWrist == 0 && rWrist == 0 && move == "f'") {
+                        speed += overwork(lIndex, "uflick");
+                        speed += overwork(lMiddle, "home");
+                        speed += 1;
+                        lIndex = [speed, "fflick"];
+                    }
+                    else if (j == 0 && rWrist == 0 && lWrist == 0) {
+                        speed += overwork(lThumb, "top");
+                        speed += 1;
+                        lThumb = [speed, "rdown"];
+                        lMiddle = [speed, "uflick"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "F2":
+                    if (rWrist == -1 && (lWrist != -1 || (Math.max(overwork(rIndex, "home"), overwork(rMiddle, "home"), overwork(rRing, "u2grip")) <= Math.max(overwork(lIndex, "home"), overwork(lMiddle, "home"), overwork(lRing, "u2grip"))))) {
+                        speed += overwork(rIndex, "home");
+                        speed += overwork(rMiddle, "home");
+                        speed += overwork(rRing, "u2grip");
+                        speed += double;
+                        rIndex = [speed, "uflick"];
+                        rMiddle = [speed, "uflick"]
+                    } else if (lWrist == -1) {
+                        speed += overwork(lIndex, "home");
+                        speed += overwork(lMiddle, "home");
+                        speed += overwork(lRing, "u2grip");
+                        speed += double;
+                        lIndex = [speed, "uflick"];
+                        lMiddle = [speed, "uflick"];
+                    } else if (rWrist == 1 && (lWrist != 1 || (Math.max(overwork(rMiddle, "home"), overwork(rRing, "home")) <= Math.max(overwork(lMiddle, "home"), overwork(lRing, "home"))))) {
+                        speed += overwork(rMiddle, "home");
+                        speed += overwork(rRing, "home");
+                        if (prevMove[0] == "D") { speed += double * ringMult + moveblock * 0.5 } else { speed += double * ringMult }
+                        rRing = [speed, "dflick"]
+                    } else if (lWrist == 1) {
+                        speed += overwork(lMiddle, "home");
+                        speed += overwork(lRing, "home");
+                        if (prevMove[0] == "D") { speed += double * ringMult + moveblock * 0.5 } else { speed += double * ringMult }
+                        lRing = [speed, "dflick"]
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "L":
+                    if (lWrist == 2) { lWrist = 0 } else if (lWrist > -1 && !(rWrist >= 1 && lWrist <= 0)) { lWrist-- } else { return [j, speed, lWrist - 1, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])] }
+                    speed += wristMult;
+                    break;
+                case "L'":
+                    if (lWrist < 2 && !(rWrist <= -1 && lWrist >= 0)) { lWrist++ } else { return [j, speed, lWrist + 1, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])] }
+                    speed += wristMult;
+                    break;
+                case "L2":
+                    if (lWrist >= 1 && rWrist < 1) { lWrist = -1 } else if (rWrist > -1) { lWrist += 2 } else { return [j, speed, (lWrist > 0) ? lWrist - 2 : lWrist + 2, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])] }
+                    speed += double * wristMult;
+                    break;
+                case "B":
+                    if (rWrist == 1) {
+                        speed += overwork(rIndex, "home");
+                        speed++;
+                        rIndex = [speed, "uflick"];
+                    } else if (lWrist == -1) {
+                        speed += overwork(lRing, "home");
+                        speed += overwork(lMiddle, "home");
+                        if (prevMove[0] == "U") { speed += moveblock * 0.5 + ringMult } else { speed += ringMult }
+                        lRing = [speed, "dflick"];
+                    } else if (lWrist == 1 && prevMove[0] != "U" && prevMove[0] != "D") {
+                        if (lIndex[1] == "uflick") {
+                            speed += overwork(lIndex, "eido", 0.75 * overWorkMult);
+                            speed = Math.max(speed, lOhCool + 2.5);
+                        } else {
+                            speed += overwork(lIndex, "eido", 1.25 * overWorkMult);
+                        }
+                        speed += 1.15 * pushMult;
+                        lIndex = [speed, "uflick"];
+                        lOhCool = speed;
+                    } else if (lWrist == 0 && (rWrist == 1 || rWrist == -1)) {
+                        speed += overwork(lIndex, "top", 0.9 * overWorkMult);
+                        if (prevMove[0] == "U") { speed += 1.45 } else { speed += 1 }
+                        lIndex = [speed, "leftdb"];
+                    } else if (rWrist == -1 && prevMove[0] != "U") {
+                        speed += overwork(rRing, "dflick");
+                        speed += overwork(rMiddle, "home");
+                        speed += ringMult * pushMult;
+                        rRing = [speed, "home"]
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "B'":
+                    if (lWrist == 1) {
+                        speed += overwork(lIndex, "home");
+                        speed++;
+                        lIndex = [speed, "uflick"];
+                    } else if (rWrist == -1) {
+                        speed += overwork(rRing, "home");
+                        speed += overwork(rMiddle, "home");
+                        if (prevMove[0] == "U") { speed += moveblock * 0.5 + ringMult } else { speed += ringMult }
+                        rRing = [speed, "dflick"];
+                    } else if (rWrist == 1 && prevMove[0] != "U" && prevMove[0] != "D") {
+                        if (rIndex[1] == "uflick") {
+                            speed += overwork(rIndex, "eido", 0.75 * overWorkMult);
+                            speed = Math.max(speed, rOhCool + 2.5);
+                        } else {
+                            speed += overwork(rIndex, "eido", 1.25 * overWorkMult);
+                        }
+                        speed += 1.15 * pushMult;
+                        rIndex = [speed, "uflick"];
+                        rOhCool = speed;
+                    } else if (rWrist == 0 && (lWrist == 1 || lWrist == -1)) {
+                        speed += overwork(rIndex, "top", 0.9 * overWorkMult);
+                        if (prevMove[0] == "U") { speed += 1.45 } else { speed += 1 }
+                        rIndex = [speed, "rightdb"];
+                    } else if (lWrist == -1 && prevMove[0] != "U") {
+                        speed += overwork(lRing, "dflick");
+                        speed += overwork(lMiddle, "home");
+                        speed += ringMult * pushMult;
+                        lRing = [speed, "home"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "B2":
+                    if (rWrist == 1 && (lWrist != 1 || (Math.max(overwork(rIndex, "home"), overwork(rMiddle, "home"), overwork(rRing, "u2grip")) <= Math.max(overwork(lIndex, "home"), overwork(lMiddle, "home"), overwork(lRing, "u2grip"))))) {
+                        speed += overwork(rIndex, "home");
+                        speed += overwork(rMiddle, "home");
+                        speed += overwork(rRing, "u2grip");
+                        speed += double;
+                        rIndex = [speed, "uflick"];
+                        rMiddle = [speed, "uflick"]
+                    } else if (lWrist == 1) {
+                        speed += overwork(lIndex, "home");
+                        speed += overwork(lMiddle, "home");
+                        speed += overwork(lRing, "u2grip");
+                        speed += double;
+                        lIndex = [speed, "uflick"];
+                        lMiddle = [speed, "uflick"];
+                    } else if (lWrist == -1 && (rWrist != -1 || (Math.max(overwork(rMiddle, "home"), overwork(rRing, "home")) > Math.max(overwork(lMiddle, "home"), overwork(lRing, "home"))))) {
+                        speed += overwork(lMiddle, "home");
+                        speed += overwork(lRing, "home");
+                        if (prevMove[0] == "U") { speed += moveblock * 0.5 + double * ringMult } else { speed += double * ringMult }
+                        lRing = [speed, "dflick"]
+                    } else if (rWrist == -1) {
+                        speed += overwork(rMiddle, "home");
+                        speed += overwork(rRing, "home");
+                        if (prevMove[0] == "U") { speed += moveblock * 0.5 + double * ringMult } else { speed += double * ringMult }
+                        rRing = [speed, "dflick"]
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "S":
+                    if (rWrist == 0 && (lWrist != 0 || overwork(rIndex, "top", 1.25 * overWorkMult) <= (moveblock * 0.5 + pushMult - 1) * sesliceMult)) {
+                        speed += overwork(rIndex, "top", 1.25 * overWorkMult);
+                        speed += sesliceMult;
+                        rIndex = [speed, "sflick"];
+                    } else if (lWrist == 0 && rWrist == -1) {
+                        speed += overwork(rIndex, "home", 1.25 * overWorkMult);
+                        speed += overwork(rThumb, "top", 1.25 * overWorkMult);
+                        speed += overwork(rMiddle, "home", 1.25 * overWorkMult)
+                        speed += sesliceMult;
+                        rThumb = [speed, "top"];
+                        rMiddle = [speed, "eflick"];
+                    } else if (lWrist == 0 && (rWrist == 0 || (rWrist == 1 && (prevMove == "R" || prevMove == "L")))) {
+                        speed += overwork(lIndex, "uflick", 1.25 * overWorkMult);
+                        if (prevMove[0] == "U") { speed += moveblock * 0.5 + pushMult * sesliceMult } else { speed += pushMult * sesliceMult }
+                        lIndex = [speed, "top"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])];
+                    }
+                    break;
+                case "S'":
+                    if (lWrist == 0 && (rWrist != 0 || overwork(lIndex, "top", 1.25 * overWorkMult) <= (moveblock * 0.5 + pushMult - 1) * sesliceMult)) {
+                        speed += overwork(lIndex, "top", 1.25 * overWorkMult);
+                        speed += sesliceMult;
+                        lIndex = [speed, "sflick"];
+                    } else if (rWrist == 0 && lWrist == -1) {
+                        speed += overwork(lIndex, "home", 1.25 * overWorkMult);
+                        speed += overwork(lThumb, "bottom", 1.25 * overWorkMult);
+                        speed += overwork(lMiddle, "home", 1.25 * overWorkMult);
+                        speed += sesliceMult;
+                        lThumb = [speed, "top"];
+                        lMiddle = [speed, "eflick"];
+                    } else if (rWrist == 0 && (lWrist == 0 || (lWrist == 1 && (prevMove == "R" || prevMove == "L")))) {
+                        speed += overwork(rIndex, "uflick", 1.25 * overWorkMult);
+                        if (prevMove[0] == "U") { speed += moveblock * 0.5 + pushMult * sesliceMult } else { speed += pushMult * sesliceMult }
+                        rIndex = [speed, "top"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])];
+                    }
+                    break;
+                case "S2":
+                    if ((rWrist == -1 || rWrist == 1) && lWrist == 0) {
+                        speed += overwork(rThumb, "home");
+                        speed += overwork(rIndex, "home");
+                        speed += overwork(rMiddle, "home");
+                        speed += overwork(rRing, "u2grip");
+                        speed += sesliceMult * double;
+                        rMiddle = [speed, "e"];
+                        rIndex = [speed, "e"];
+                    } else if ((lWrist == -1 || lWrist == 1) && rWrist == 0) {
+                        speed += overwork(lThumb, "home");
+                        speed += overwork(lIndex, "home");
+                        speed += overwork(lMiddle, "home");
+                        speed += overwork(lRing, "u2grip");
+                        speed += sesliceMult * double;
+                        rMiddle = [speed, "e"];
+                        rIndex = [speed, "e"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "E":
+                    if ((rWrist == 1 || rWrist == -1) && lWrist == 0) {
+                        speed += overwork(lIndex, "home");
+                        speed += sesliceMult;
+                        lIndex = [speed, "e"];
+                    } else if ((lWrist == 1 || lWrist == -1) && rWrist == 0 && prevMove[0] != "B") {
+                        speed += overwork(rIndex, "e");
+                        speed += sesliceMult * pushMult;
+                        rIndex = [speed, "home"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "E'":
+                    if ((lWrist == 1 || lWrist == -1) && rWrist == 0) {
+                        speed += overwork(rIndex, "home");
+                        speed += sesliceMult;
+                        rIndex = [speed, "e"];
+                    } else if ((rWrist == 1 || rWrist == -1) && lWrist == 0 && prevMove[0] != "B") {
+                        speed += overwork(lIndex, "e");
+                        speed += sesliceMult * pushMult;
+                        lIndex = [speed, "home"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "E2":
+                    if ((lWrist == 1 || lWrist == -1) && rWrist == 0) {
+                        speed += overwork(rIndex, "home");
+                        speed += overwork(rMiddle, "home");
+                        speed += overwork(rRing, "u2grip");
+                        speed += sesliceMult * double;
+                        rIndex = [speed, "e"];
+                        rMiddle = [speed, "e"];
+                    } else if ((rWrist == 1 || rWrist == -1) && lWrist == 0) {
+                        speed += overwork(lIndex, "home");
+                        speed += overwork(lMiddle, "home");
+                        speed += overwork(lRing, "u2grip");
+                        speed += sesliceMult * double;
+                        lIndex = [speed, "e"];
+                        lMiddle = [speed, "e"];
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "M'":
+                    if (lWrist == 0) {
+                        speed += overwork(lThumb, "home");
+                        speed += overwork(lIndex, "m");
+                        speed += overwork(lMiddle, "m");
+                        speed += overwork(lRing, "m");
+                        if (prevMove[0] == "B") { speed += 1.8 } else { speed += 1 }
+                        lThumb = [speed, "home"];
+                        lIndex = [speed, "m"];
+                        lMiddle = [speed, "mflick"];
+                        lRing = [speed, "m"]
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "M":
+                    if (lWrist == 0 && prevMove[0] != "B") {
+                        speed += overwork(lThumb, "home");
+                        speed += overwork(lIndex, "m");
+                        speed += overwork(lMiddle, "mflick", 1.25 * overWorkMult);
+                        speed += overwork(lRing, "m");
+                        speed += pushMult;
+                        lThumb = [speed, "home"];
+                        lIndex = [speed, "m"];
+                        lMiddle = [speed, "m"];
+                        lRing = [speed, "m"]
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "M2":
+                    if (lWrist == 0) {
+                        speed += overwork(lThumb, "home");
+                        speed += overwork(lIndex, "m");
+                        speed += overwork(lMiddle, "m");
+                        speed += overwork(lRing, "m");
+                        if (prevMove[0] == "B") { speed += moveblock + double } else { speed += double }
+                        lThumb = [speed, "home"];
+                        lIndex = [speed, "m"];
+                        lMiddle = [speed, "mflick"];
+                        lRing = [speed, "m"]
+                    } else {
+                        return [j, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                // Every action costs time: MCC models x as a free wrist shift,
+                // but a whole-cube rotation is charged like y/z.
+                case "X":
+                    speed += rotation;
+                    lWrist += 1;
+                    rWrist += 1;
+                    if (lWrist > 1 || rWrist > 1) {
+                        return [j + 1, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "X'":
+                    speed += rotation;
+                    lWrist -= 1;
+                    rWrist -= 1;
+                    if (lWrist < -1 || rWrist < -1) {
+                        return [j + 1, speed, lWrist, rWrist, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "X2":
+                    // Charged only where the token is consumed: the other
+                    // branches hand back to the grip search, which re-runs it.
+                    if (lWrist >= 1 && rWrist >= 1) {
+                        speed += rotation * double;
+                        lWrist -= 2;
+                        rWrist -= 2;
+                    } else if (lWrist <= -1 && rWrist <= -1) {
+                        speed += rotation * double;
+                        lWrist += 2;
+                        rWrist += 2;
+                    } else if (lWrist + rWrist > 0) {
+                        return [j, speed, lWrist - 2, rWrist - 2, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    } else {
+                        return [j, speed, lWrist + 2, rWrist + 2, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    }
+                    break;
+                case "Y": case "Y'": case "Z": case "Z'":
+                    speed += rotation;
+                    return [j + 1, speed, 0, 0, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    break;
+                case "Y2": case "Z2":
+                    speed += rotation * double;
+                    return [j + 1, speed, 0, 0, Math.max(lThumb[0], lIndex[0], lMiddle[0], lRing[0]), Math.max(rThumb[0], rIndex[0], rMiddle[0], rRing[0])]
+                    break;
+                default:
+                    return "Unknown move: " + move
+            }
+            if (firstMoveSpeed !== null) {
+                speed = Math.max(firstMoveSpeed, speed) + 0.5;
+                prevSpeed = null;
+                firstMoveSpeed = null;
+            }
+            if ((move[0] == "R" || move[0] == "l") && grip == -1) {
+                grip = 1;
+                speed += 0.65;
+            } else if ((move[0] == "r" || move[0] == "L") && grip == 1) {
+                grip = -1;
+                speed += 0.65;
+            }
+            if ((move[0] == "d") && udgrip == -1) {
+                udgrip = 1;
+                speed += 2.25;
+            } else if ((move[0] == "U" || move[0] == "u") && udgrip == 1) {
+                udgrip = -1;
+                speed += 2.25;
+            }
+            if (j >= 2) {
+                if ((normalMove == "R" && move == splitSeq[j - 2] && upperSeq[j - 1] == "U'") || (normalMove == "R'" && move == splitSeq[j - 2] && upperSeq[j - 1] == "U")) {
+                    speed -= 0.5;
+                } else if ((normalMove == "R" && move == splitSeq[j - 2] && upperSeq[j - 1] == "D'" && rWrist == 1) || (normalMove == "R'" && move == splitSeq[j - 2] && upperSeq[j - 1] == "D")) {
+                    speed -= 0.3;
+                }
+            }
+            if (normalMove == "U" && (lWrist == -1 || rWrist == -1)) {
+                speed += destabilize;
+            }
+            if (normalMove == "B" && (lWrist == 0 || rWrist == 0)) {
+                speed += destabilize;
+            }
+            if (normalMove == "D" && (lWrist == 1 || rWrist == 1)) {
+                speed += destabilize;
+            }
+            if (normalMove == "S" && (lWrist == 1 || rWrist == 1 || lWrist == -1 || rWrist == -1)) {
+                speed += destabilize;
+            }
+            if (normalMove == "E" && (lWrist == 0 || rWrist == 0)) {
+                speed += destabilize;
+            }
+        }
+        return [-1, speed, lGrip, rGrip]
+    }
+    let splitSeq = Array.isArray(sequence) ? sequence : sequence.split(" ");
+    let trueSplitSeq = [];
+    for (let i = 0; i < splitSeq.length; i++) {
+        if (ignoreErrors) {
+            if (["r", "r2", "r'", "u", "u'", "u2", "f", "f2", "f'", "d", "d2", "d'", "l", "l2", "l'", "b", "b2", "b'", "m", "m2", "m'", "s", "s2", "s'", "e", "e2", "e'", "x", "x'", "x2", "y", "y'", "y2", "z", "z'", "z2"].includes(splitSeq[i].toLowerCase())) {
+                trueSplitSeq.push(splitSeq[i])
+            }
+        } else {
+            if (splitSeq[i] != "") {
+                trueSplitSeq.push(splitSeq[i])
+            }
+        }
+    }
+    splitSeq = trueSplitSeq.slice()
+    if (ignoreauf) {
+        if (splitSeq.length >= 1) {
+            if (splitSeq[0][0] == "U") {
+                splitSeq.shift()
+            } else if (splitSeq.length >= 2) {
+                if (splitSeq[0][0].toLowerCase() == "d" && splitSeq[1][0] == "U") {
+                    splitSeq[1] = splitSeq[0]
+                    splitSeq.shift()
+                }
+            }
+        }
+        if (splitSeq.length >= 1) {
+            if (splitSeq[splitSeq.length - 1][0] == "U") {
+                splitSeq.pop()
+            } else if (splitSeq.length >= 2) {
+                if (splitSeq[splitSeq.length - 1][0].toLowerCase() == "d" && splitSeq[splitSeq.length - 2][0] == "U") {
+                    splitSeq[splitSeq.length - 2] = splitSeq[splitSeq.length - 1]
+                    splitSeq.pop()
+                }
+            }
+        }
+    }
+    const fullSeq = splitSeq;
+    const fullUpper = fullSeq.map(mccUpper);
+    let offset = resume ? resume.offset : 0;
+    let starts = resume ? resume.starts : [[0, 0, 0], [0, -1, 1 + addRegrip], [0, 1, 1 + addRegrip], [-1, 0, 1 + addRegrip], [1, 0, 1 + addRegrip]];
+    while (true) {
+        splitSeq = offset ? fullSeq.slice(offset) : fullSeq;
+        const upperSeq = offset ? fullUpper.slice(offset) : fullUpper;
+        const tests = new Array(starts.length);
+        for (let i = 0; i < starts.length; i++) tests[i] = test(splitSeq, upperSeq, starts[i][0], starts[i][1], starts[i][2]);
+        // A test that failed at k looked at moves up to k + 1 at most.
+        if (stopAt !== undefined && !tests.every(t => typeof t[0] === 'number' && t[0] >= 0 && offset + t[0] + 1 < stopAt)) {
+            return { offset, starts };
+        }
+        for (let i = 0; i < tests.length; i++) {
+            if (tests[i][0] === "U") { // (never true: test() returns numeric indices; was ==, which coerced on every call)
+                return tests[i]
+            }
+        }
+        let bestTest = tests[0]
+        for (let i = 1; i < tests.length; i++) {
+            let compTest = tests[i];
+            if (compTest[0] == -1 && (bestTest[0] != -1 || bestTest[1] > compTest[1])) { bestTest = compTest }
+            else if (compTest[0] > bestTest[0] && bestTest[0] != -1) { bestTest = compTest }
+            else if (compTest[0] == bestTest[0] && compTest[1] < bestTest[1] && bestTest[0] != -1) { bestTest = compTest }
+        }
+        if (bestTest[0] == -1) { return Math.round(bestTest[1] * 10) / 10 }
+        starts = [];
+
+        let prevMoveType = bestTest[0] >= 1 ? splitSeq[bestTest[0] - 1][0] : " ";
+        let prev2Type = bestTest[0] >= 2 ? splitSeq[bestTest[0] - 2][0] : " ";
+        let doubleRegrip = false;
+
+        if ((bestTest[2] > 1 || bestTest[2] < -1) && (bestTest[3] > 1 || bestTest[3] < -1)) {
+            doubleRegrip = true;
+        }
+
+        const prevIsRotation = prevMoveType === "X" || prevMoveType === "x" || prevMoveType === "Y" || prevMoveType === "y" || prevMoveType === "Z" || prevMoveType === "z";
+        for (let leftWrist = -1; leftWrist < 2; leftWrist++) {
+            for (let rightWrist = -1; rightWrist < 2; rightWrist++) {
+                let leftMatch = (bestTest[2] == leftWrist);
+                let rightMatch = (bestTest[3] == rightWrist);
+                if (prevIsRotation) {
+                    starts.push([leftWrist, rightWrist, bestTest[1]]);
+                }
+                else {
+                    let penalty = doubleRegrip ? (rotation * double) : 2;
+                    let rMoveLatency;
+                    if (prevMoveType == "R" || prev2Type == "R" || prevMoveType == "r" || prev2Type == "r") { rMoveLatency = 1 } else { rMoveLatency = 0 }
+                    let lMoveLatency;
+                    if (prevMoveType == "L" || prev2Type == "L" || prevMoveType == "l" || prev2Type == "l") { lMoveLatency = 1 } else { lMoveLatency = 0 }
+                    if (leftMatch || doubleRegrip) {
+                        let rHandLatency = Math.max(0, 2 - (bestTest[1] - bestTest[5]));
+                        penalty = Math.max(rHandLatency, rMoveLatency, lMoveLatency * 2)
+                        starts.push([leftWrist, rightWrist, bestTest[1] + penalty + addRegrip])
+                    } else if (rightMatch || doubleRegrip) {
+                        let lHandLatency = Math.max(0, 2 - (bestTest[1] - bestTest[4]));
+                        penalty = Math.max(lHandLatency, lMoveLatency, rMoveLatency * 2)
+                        starts.push([leftWrist, rightWrist, bestTest[1] + penalty + addRegrip])
+                    }
+                }
+            }
+        }
+        offset += bestTest[0];
+    }
+}
+
+function algSpeedPrefix(prefix, A = ALG_SPEED_DEFAULTS) {
+    const tokens = String(prefix || '').split(" ").filter(t => t !== "");
+    if (!tokens.length) return { tokens, state: null, A };
+    const state = algSpeed(tokens, false, false, A.wristMult, A.pushMult, A.ringMult, A.destabilize, A.addRegrip, A.double, A.sesliceMult, A.overWorkMult, A.moveblock, A.rotation, null, tokens.length);
+    // Rounds never look behind their own start, so only the tail is kept.
+    return { tokens: tokens.slice(state.offset), state: { offset: 0, starts: state.starts }, A };
+}
+
+function algSpeedResume(checkpoint, suffix) {
+    let tokens = String(suffix || '').split(" ");
+    if (tokens.indexOf("") !== -1) tokens = tokens.filter(t => t !== "");
+    const A = checkpoint.A || ALG_SPEED_DEFAULTS;
+    return algSpeed(checkpoint.tokens.concat(tokens), false, false, A.wristMult, A.pushMult, A.ringMult, A.destabilize, A.addRegrip, A.double, A.sesliceMult, A.overWorkMult, A.moveblock, A.rotation, checkpoint.state);
+}
+
+function cleanScramble(str) {
+    return String(str)
+        .replace(/\bnone\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function isPseudoState(state) {
+    const corners = state.corners ?? [];
+    const edges = state.edges ?? [];
+    if (corners.length !== edges.length) return true;
+
+    const sortedCorners = [...corners].sort();
+    const sortedEdges = [...edges].sort();
+    return !sortedCorners.every((corner, idx) => corner === sortedEdges[idx]);
+}
+
+function calculateSolvedPieces(sourceNode, targetNode) {
+    const prevCorners = new Set(sourceNode.state.corners ?? []);
+    const prevEdges = new Set(sourceNode.state.edges ?? []);
+
+    const newCorners = (targetNode.state.corners ?? []).filter(corner => !prevCorners.has(corner)).length;
+    const newEdges = (targetNode.state.edges ?? []).filter(edge => !prevEdges.has(edge)).length;
+    const crossAdded = sourceNode.state.cross_solved ? 0 : 4;
+
+    return newCorners + newEdges + crossAdded;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        algSpeed,
+        algSpeedPrefix,
+        algSpeedResume,
+        ALG_SPEED_DEFAULTS,
+        STEP_PENALTIES,
+        PLANNING_OFF_SCORING,
+        DEFAULT_SCORING,
+        scoringFor,
+        stepPenalty,
+        PAIR_CHOICE_LOOK,
+        PAIR_PLANNING,
+        algSurprise,
+        buildNaturalnessModel,
+        useNaturalnessModel,
+        currentNaturalnessModel,
+        HUMAN_F2L_ALGS,
+        proStepAlgs,
+        f2lCorpusAlgs,
+        NATURALNESS,
+        altAlgs,
+        cleanScramble,
+        isPseudoState,
+        calculateSolvedPieces,
+        pruneGraph,
+        normalizeCriteria,
+        CRITERIA_VERSION,
+        RETIRED_OPTIONS,
+        ALWAYS_ON_OPTIONS
+    };
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', async () => {
+        installInfoDialog();
+        buildLimitsTable();
+        if (document.getElementById('scramble-input')) {
+            // A corrupt saved blob only loses the restored values, not the page.
+            try {
+                restoreTextareaState();
+                restoreCheckboxState();
+            } catch (err) {
+                console.warn('Saved settings could not be restored', err);
+            }
+        }
+
+        if (!window.location.pathname.endsWith('solver.html')) return;
+
+        // The solver page cannot search without a saved search (opened
+        // directly) or without the DAG; say so instead of sitting idle.
+        const showSetupError = (msg) => {
+            const status = document.getElementById('search-status');
+            if (status) status.textContent = msg;
+            const box = document.getElementById('search-state');
+            if (box) box.dataset.state = 'error';
+        };
+
+        let criteria = null;
+        try {
+            criteria = loadSearchCriteria();
+        } catch (err) {
+            criteria = null;
+        }
+        if (!criteria || !criteria.scrambles?.length) {
+            criteria = criteriaFromProfile(criteria);
+            if (criteria) restoreCheckboxState(); // the form shows the search just saved
+        }
+        if (!criteria) {
+            const display = document.getElementById('scramble-display');
+            if (display) display.textContent = '';
+            showSetupError(typeof caption === 'function' ? caption('solve.noSetup') : '');
+            return;
+        }
+
+        scrambleController.init(criteria.scrambles);
+
+        let rawTree;
+        try {
+            const response = await fetch('data/f2l_nodes_and_edges.json');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            rawTree = await response.json();
+        } catch (err) {
+            showSetupError(`failed to load the search graph (${err.message}). reload to try again.`);
+            return;
+        }
+        const prunedTree = pruneGraph(rawTree, { ...criteria, advanced: [...criteria.advanced, 'multislotting'] });
+
+        if (typeof window.onPrunedTreeReady === 'function') {
+            window.onPrunedTreeReady(prunedTree, criteria);
+        }
+    });
+}

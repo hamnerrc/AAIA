@@ -1,0 +1,22 @@
+case,group,votes,alg,stm,score,states,P_no_pre_auf,P_no_post_auf,qualifying_alternates,mean_alt_stm_minus_base
+Aa,Adj Swap,201,x R' U R' D2 R U' R' D2 R2 x',9,61.5,16,1/4,1/4,0,
+Ab,Adj Swap,164,x R2 D2 R U R' D2 R U' R x',9,62.9,16,1/4,1/4,0,
+E,Opp Swap,163,x' R U' R' D R U R' D' R U R' D R U' R' D' x,16,80.0,8,1/2,3/8,0,
+F,Adj Swap,194,R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R,18,77.0,16,1/4,1/4,0,
+Ga,Adj Swap,119,R2 U R' U R' U' R U' R2 D U' R' U R D',15,90.8,16,1/4,1/4,12,0.83
+Gb,Adj Swap,143,D R' U' R U D' R2 U R' U R U' R U' R2,15,95.0,16,1/4,1/4,12,1.5
+Gc,Adj Swap,99,R2 U' R U' R U R' U R2 D' U R U' R' D,15,96.2,16,1/4,1/4,13,2.23
+Gd,Adj Swap,109,R U R' U' D R2 U' R U' R' U R' U R2 D',15,82.8,16,1/4,1/4,2,-0.5
+H,EPLL,142,M2 U M2 U2 M2 U M2,7,69.8,4,1,1/4,0,
+Ja,Adj Swap,150,x R2 F R F' R U2 r' U r U2 x',10,73.2,16,1/4,1/4,3,2.0
+Jb,Adj Swap,211,R U R' F' R U R' U' R' F R2 U' R',13,54.2,16,1/4,1/4,0,
+Na,Opp Swap,154,R U R' U R U R' F' R U R' U' R' F R2 U' R' U2 R U' R',21,83.9,4,1,1/4,0,
+Nb,Opp Swap,124,R' U R U' R' F' U' F R U R' F R' F' R U' R,17,94.5,4,1,1/4,5,0.0
+Ra,Adj Swap,152,R U' R' U' R U R D R' U' R D' R' U2 R',15,72.6,16,1/4,1/4,1,0.0
+Rb,Adj Swap,113,R' U2 R U2 R' F R U R' U' R' F' R2,13,68.5,16,1/4,1/4,0,
+T,Adj Swap,223,R U R' U' R' F R2 U' R' U' R U R' F',14,58.9,16,1/4,1/4,0,
+Ua,EPLL,137,M2 U M U2 M' U M2,7,57.2,16,1/4,1/4,1,6.0
+Ub,EPLL,131,M2 U' M U2 M' U' M2,7,58.0,16,1/4,1/4,1,4.0
+V,Opp Swap,107,R' U R' U' R D' R' D R' U D' R2 U' R2 D R2,16,112.9,16,1/4,1/4,14,0.07
+Y,Opp Swap,171,F R U' R' U' R U R' F' R U R' U' R' F R F',17,74.8,16,1/4,1/4,0,
+Z,EPLL,92,M' U' M2 U' M2 U' M' U2 M2,9,87.3,8,1/2,3/8,13,5.85

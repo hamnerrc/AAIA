@@ -1,0 +1,42 @@
+case,group,votes,as_listed,body_used,stm,placements,probability,P_no_auf,insert_tail,has_U2_and_sledge_variants
+F2L 1,Free Pairs,132,U R U' R',R U' R',3,4,4/150,1/4,std,True
+F2L 2,Free Pairs,61,F R' F' R,F R' F' R,4,4,4/150,1/4,,False
+F2L 3,Free Pairs,48,F' U' F,F' U' F,3,4,4/150,1/4,,False
+F2L 4,Free Pairs,61,R U R',R U R',3,4,4/150,1/4,,False
+F2L 5,Disconnected Pairs,71,U' R U R' U2 R U' R',R U R' U2 R U' R',7,4,4/150,1/4,std,True
+F2L 6,Disconnected Pairs,51,U' r U' R' U R U r',r U' R' U R U r',7,4,4/150,1/4,,False
+F2L 7,Disconnected Pairs,36,U' R U2 R' U' R U2 R',R U2 R' U' R U2 R',7,4,4/150,1/4,,False
+F2L 8,Disconnected Pairs,38,r' U2 R2 U R2 U r,r' U2 R2 U R2 U r,7,4,4/150,1/4,,False
+F2L 9,Disconnected Pairs,40,U' R U' R' U F' U' F,R U' R' U F' U' F,7,4,4/150,1/4,,False
+F2L 10,Disconnected Pairs,40,U' R U R' U R U R',R U R' U R U R',7,4,4/150,1/4,,False
+F2L 11,Connected Pairs,44,U' R U2 R' U F' U' F,R U2 R' U F' U' F,7,4,4/150,1/4,,False
+F2L 12,Connected Pairs,35,R U' R' U R U' R' U2 R U' R',R U' R' U R U' R' U2 R U' R',11,4,4/150,1/4,std,True
+F2L 13,Connected Pairs,41,y' U R' U R U' R' U' R,y' R' U R U' R' U' R,7,4,4/150,1/4,,False
+F2L 14,Connected Pairs,47,U' R U' R' U R U R',R U' R' U R U R',7,4,4/150,1/4,,False
+F2L 15,Connected Pairs,41,M U r U' r' U' M',M U r U' r' U' M',7,4,4/150,1/4,,False
+F2L 16,Connected Pairs,35,R U' R' U2 F' U' F,R U' R' U2 F' U' F,7,4,4/150,1/4,,False
+F2L 17,Connected Pairs,43,R U2 R' U' R U R',R U2 R' U' R U R',7,4,4/150,1/4,,False
+F2L 18,Connected Pairs,27,y' R' U2 R U R' U' R,y' R' U2 R U R' U' R,7,4,4/150,1/4,,False
+F2L 19,Disconnected Pairs,37,U R U2 R' U R U' R',R U2 R' U R U' R',7,4,4/150,1/4,std,True
+F2L 20,Disconnected Pairs,32,y' U' R' U2 R U' R' U R,y' R' U2 R U' R' U R,7,4,4/150,1/4,,False
+F2L 21,Disconnected Pairs,27,U2 R U R' U R U' R',R U R' U R U' R',7,4,4/150,1/4,std,True
+F2L 22,Disconnected Pairs,28,r U' r' U2 r U r',r U' r' U2 r U r',7,4,4/150,1/4,,False
+F2L 23,Connected Pairs,33,U R U' R' U' R U' R' U R U' R',R U' R' U' R U' R' U R U' R',11,4,4/150,1/4,std,True
+F2L 24,Connected Pairs,37,F U R U' R' F' R U' R',F U R U' R' F' R U' R',9,4,4/150,1/4,std,True
+F2L 25,Corner In Slot,31,U' R' F R F' R U R',R' F R F' R U R',7,4,4/150,1/4,,False
+F2L 26,Corner In Slot,24,U R U' R' F R' F' R,R U' R' F R' F' R,7,4,4/150,1/4,,False
+F2L 27,Corner In Slot,33,R U' R' U R U' R',R U' R' U R U' R',7,4,4/150,1/4,std,True
+F2L 28,Corner In Slot,24,R U R' U' F R' F' R,R U R' U' F R' F' R,8,4,4/150,1/4,,False
+F2L 29,Corner In Slot,22,R' F R F' U R U' R',R' F R F' U R U' R',8,4,4/150,1/4,std,True
+F2L 30,Corner In Slot,34,R U R' U' R U R',R U R' U' R U R',7,4,4/150,1/4,,False
+F2L 31,Edge In Slot,29,U' R' F R F' R U' R',R' F R F' R U' R',7,4,4/150,1/4,std,True
+F2L 32,Edge In Slot,38,U R U' R' U R U' R' U R U' R',R U' R' U R U' R' U R U' R',11,4,4/150,1/4,std,True
+F2L 33,Edge In Slot,31,U' R U' R' U2 R U' R',R U' R' U2 R U' R',7,4,4/150,1/4,std,True
+F2L 34,Edge In Slot,28,U R U R' U2 R U R',R U R' U2 R U R',7,4,4/150,1/4,,False
+F2L 35,Edge In Slot,25,U' R U R' U F' U' F,R U R' U F' U' F,7,4,4/150,1/4,,False
+F2L 36,Edge In Slot,23,U F' U' F U' R U R',F' U' F U' R U R',7,4,4/150,1/4,,False
+F2L 37,Pieces In Slot,37,R2 U2 F R2 F' U2 R' U R',R2 U2 F R2 F' U2 R' U R',9,1,1/150,1/1,,False
+F2L 38,Pieces In Slot,22,R U' R' U' R U R' U2 R U' R',R U' R' U' R U R' U2 R U' R',11,1,1/150,1/1,std,True
+F2L 39,Pieces In Slot,29,R U' R' U R U2 R' U R U' R',R U' R' U R U2 R' U R U' R',11,1,1/150,1/1,std,True
+F2L 40,Pieces In Slot,27,r U' r' U2 r U r' R U R',r U' r' U2 r U r' R U R',10,1,1/150,1/1,,False
+F2L 41,Pieces In Slot,24,R U' R' r U' r' U2 r U r',R U' R' r U' r' U2 r U r',10,1,1/150,1/1,,False

@@ -2,24 +2,31 @@
 
 ## Project Status (Updated 2026-11-05)
 
-**Completed:**
-- ✅ Detailed 15-page outline (`OUTLINE.md`) with section-by-section guidance, page budgets, data requirements, and quality checks.
-- ✅ Identified current codebase: spreadsheet (LSLL distributions.xlsx) with inelegant AUF handling, and structured JSON algorithm data (cube-simulator-and-algs/).
-- ✅ Generated `questions.txt` with 15 clarification questions for author.
+**Research is complete. The author is writing the paper.** Read these first:
 
-**Next phase (awaiting author answers):**
-1. Confirm data sources (JSON vs. spreadsheet preference).
-2. Define movecount metric precisely (FTM counting rules).
-3. Clarify algorithm angle handling (single best, or distribution across angles).
-4. Define AUF distribution parameters and application scope.
-5. Explain magiccube integration (what is it, how to use it for simulation/testing).
-6. Provide exact algorithms for U2 insert, sledge insert, standard baseline.
-7. **Then:** Build clean Python codebase with separated Distribution classes, convolution pipeline, and simulation hooks.
+- `RESEARCH_FINDINGS.md`: every result, proof, assumption and limitation.
+- `OUTLINE.md`: the section-by-section plan, using those results.
+- `questions.txt`: the author's answers. These override anything else here.
+- `results/`: `results.json`, `tables/`, `figures/`, `validation.json`, `triple_cancellation.json`, `real_solves.json`, `examples.json`.
 
-**Key decisions made (for continuity):**
-- The outline is comprehensive, following the CLAUDE.md rubric closely. It identifies where independence breaks and appropriate models for each technique.
-- The existing spreadsheet combines AUFs inelegantly; the new codebase will track them separately.
-- Algorithm JSON data in cube-simulator-and-algs/ is structured (cases, angles, scores, votes); need to decide on aggregation strategy.
+**Code:** `src/lsll/` (`cube.py` engine and STM, `states.py` state space, `data.py` alg selection, `model.py` exact enumeration, `distribution.py` convolution and DFT), `scripts/`, `tests/`. To reproduce, see section 12 of the findings.
+
+**Settled by the author (these supersede older text below):**
+
+- Metric is **STM**, not FTM: every face, wide or slice turn is 1, U2 is 1, rotations are 0.
+- Only the **FR** slot. JSON is the data source; the spreadsheet is not used.
+- Baseline alg is the most upvoted. Alternates must rank equal or faster on speed score. Speed picks algs but is never the outcome.
+- U2 insert: `U R U2 R'` for `R U' R'`. Sledge insert: `U' R' F R F'` for `R U' R'`. Both swaps work in either direction.
+- Enumerate all states rather than sampling.
+- AUF of 0.25 / 0.75 is the author's working figure. Enumeration shows it is approximate (findings section 3), and the paper uses that as a result.
+
+**Corrections to earlier notes:**
+
+- Alternate angles chosen from the current step alone do **not** break independence. Only decisions or merges across a step boundary do.
+- `coll.json` has 329 OLLCP-style cases, of which 40 are true COLL (not 42).
+- F2L data contains algs for all slots and writes AUFs into algs. Both are handled in `model.py`.
+
+**Rule for future work:** the author writes the paper in their own voice. Do not draft prose, anecdotes or predictions for them.
 
 ---
 
@@ -38,7 +45,7 @@ How can probability distributions be used to compare how much last-slot and last
 
 **Scope:** Last slot and last layer only. The cross and first three pairs are excluded because the author considers them not deterministic enough to model well.
 
-**Primary outcome:** Movecount, using one consistent metric. Current working assumption: face turn metric (FTM), where U2 counts as 1 move. Movecount is not solve time; address this difference in the reflection.
+**Primary outcome:** Movecount in slice turn metric (STM), where U2 counts as 1 move and rotations count as 0. Movecount is not solve time; address this difference in the reflection.
 
 **Length:** Target about 15 pages, maximum 16. The guideline is 12-20 pages, but repetitive, tangential, or wordy material loses marks. Large tables and raw data go in appendices.
 
@@ -210,73 +217,3 @@ Suggested page budget, which you may adjust with a reason:
 - Is there anything repetitive that could go in a table or appendix?
 - Can a reader see why full distributions, rather than means alone, matter?
 - Does the page budget stay within 16 pages?
-
-## Open questions for the author (answered later after first pass)
-
-1. What exact U2 insert algorithms are meant, and which standard insert is the comparison?
-2. Which algorithm set defines each step's movecount, and how is one chosen among alternatives?
-3. Is FTM the final metric?
-4. Are cancellations applied to every technique, or tested as a separate factor?
-5. Is the "next two steps" rule applied at every decision, including the last-layer steps?
-6. Are real reconstructed solves available for validation?
-7. Does the assignment specify line spacing, citation style, or course-level expectations?
-
----
-
-## Instructions for Next Agent
-
-**When the author provides answers to questions.txt:**
-
-1. **Read and organize clarifications:**
-   - Update this CLAUDE.md with any new information (metric finality, algorithm definitions, magiccube details).
-   - Note any scope changes or new priorities.
-
-2. **Design and build the Python codebase:**
-   - Structure: `src/distributions/`, `src/convolution/`, `src/simulation/`, `src/utils/`
-   - Core components:
-     - `Distribution` class: movecount → probability mapping, with operations (convolve, DFT, mean/std/quantiles).
-     - `Metric` class: handles FTM parsing from algorithm strings.
-     - `AlgorithmSet` class: loads and aggregates OLL/PLL/COLL/etc. from JSON and/or spreadsheet.
-     - `Convolution` pipeline: direct convolution + DFT, configurable by technique.
-     - `Simulator` module: integrate magiccube (or alternative) for testing sledges, U2 inserts, edge-orientation effects.
-   - Data layer: parse JSON files cleanly, extract movecounts, handle multiple angles (by score/vote weighting or enumeration).
-   - Config file: AUF parameters, metric choice, data sources (JSON vs. spreadsheet), algorithm selection strategy.
-
-3. **Verify and validate:**
-   - Parse movecount from algorithm strings and compare against magiccube (once integrated).
-   - Test sledge insert edge-orientation changes.
-   - Test U2 insert algorithms (once defined).
-   - Verify convolution against direct enumeration on a few cases.
-
-4. **Generate baseline distributions:**
-   - Compute independent baseline (pre-AUF, LS, OLL, PLL, post-AUF) using the chosen method (JSON data).
-   - Convolve to final baseline distribution.
-   - Report mean, std dev, quantiles.
-
-5. **Implement each technique:**
-   - Two-step choice: state-by-state enumeration.
-   - Sledge + COLL + ZBLS+ZBLL: conditional/mixture models.
-   - Cancellations: simulation (sequence-level analysis).
-   - Alt. angles: distribution aggregation.
-   - Create comparison tables and visualizations.
-
-6. **Output:**
-   - `data_distributions.py`: loaded and cached distributions (baseline for each step, combined baseline, per-technique results).
-   - `convolution.py`: convolution and DFT logic.
-   - `simulation.py`: magiccube integration and test harness.
-   - `results.json` or pickle: final distributions for each technique (for paper figures).
-   - `validation_report.txt`: comparison vs. enumeration/simulation, confidence intervals.
-   - Update CLAUDE.md with any changes.
-
-**Blocking issues:**
-- If magiccube is unavailable or incompatible, use alternative (e.g., `rubiks-cube` Python package, or pure algorithm string parsing + manual verification).
-- If JSON and spreadsheet data conflict, consult author; prioritize JSON unless told otherwise.
-- If movecount metric is ambiguous, implement both FTM and HTM, with config switch.
-
-**Timeline estimate:**
-- Data loading + parsing: 2–3 hours.
-- Distribution + convolution module: 2–3 hours.
-- Baseline computation: 1 hour.
-- Technique implementations: 4–6 hours (state enumeration, simulation, aggregation).
-- Testing + validation: 2–3 hours.
-- **Total: ~15–20 hours** (parallel work welcome).

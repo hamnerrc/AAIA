@@ -1,676 +1,356 @@
-# CFOP Last-Slot-Last-Layer Paper: Detailed Outline
+# CFOP Last-Slot-Last-Layer Paper: Outline
 
-## Research Question and Central Argument
+Rebuilt after the research phase. Every number below is an exact result from `RESEARCH_FINDINGS.md`, which has the full tables, the proofs and the caveats. Anything only you can supply is marked `[NEEDED FROM AUTHOR]`.
 
-**Final Research Question:**
-How can probability distributions be used to compare how much last-slot and last-layer techniques reduce the movecount of a CFOP solve?
+## Research question
 
-**Central Argument:**
-The movecount distribution of a cube solve can be modeled as a convolution of independent step distributions, which is elegant to compute using the discrete Fourier transform (DFT). However, the most interesting techniques—two-step choice rules, cancellations, and alternate angles—violate independence, requiring careful state-by-state analysis or simulation. This limitation reveals both the power of the DFT for the baseline and the need for critical judgment in interpreting real optimizations.
+**How can probability distributions be used to compare how much last-slot and last-layer techniques reduce the movecount of a CFOP solve?**
 
-## Page Budget
+This holds up well, so I kept your working version. The results would also support a sharper variant if you prefer it: *"...and when can those distributions be combined by convolution?"*
 
-| Section | Pages |
-|---|---:|
-| 1. Introduction, Motivation, and Aims | 1 |
-| 2. Scope, Definitions, and Model Assumptions | 2 |
-| 3. Baseline Distributions and Independent Steps | 2 |
-| 4. Polynomials, Convolution, and the DFT | 3 |
-| 5. Techniques and the Failure of Independence | 3 |
-| 6. Results, Comparisons, and Validation | 2.5 |
-| 7. Reflection and Conclusion | 1.5 |
-| **Total** | **15** |
+## Central argument
 
-## Data Still Needed
+A CFOP last slot and last layer can be treated as a sum of random movecounts, and if the steps are independent the DFT combines them in one operation, which is the tool you set out to learn.
 
-- `[NEEDED FROM AUTHOR]` Exact U2 insert variant algorithms
-- `[NEEDED FROM AUTHOR]` Standard insert algorithm for comparison baseline
-- `[NEEDED FROM AUTHOR]` Clarification of algorithm selection rule (e.g., always shortest, random among shortest, solver choice)
-- `[NEEDED FROM AUTHOR]` Confirmation of FTM as final metric
-- `[NEEDED FROM AUTHOR]` Scope of cancellations (all steps, or separate comparison)
-- `[NEEDED FROM AUTHOR]` Real reconstructed solves for validation, if available
-- `[NEEDED FROM AUTHOR]` Course-level expectations (line spacing, citation style, grading rubric details)
+1. **Independence is provable, but in a specific form.** Whole blocks (an AUF together with its alg) are exactly independent, by a bijection argument. Separate AUFs are not, so the natural seven-step model is slightly wrong however good its AUF probabilities are.
+2. **The DFT is exact for the baseline** (mean 32.43, SD 4.83), and the interesting techniques then break it, along a precise line: convolution fails when a decision or a merge uses information from across a step boundary.
+3. **The failure is invisible in the mean.** Means add regardless. The damage is in the spread and the tails, which is why full distributions are needed. For OLLCP, naive convolution gives SD 4.60 against a true 3.90.
+4. **The DFT comes back** when you condition on the state and mix, matching enumeration to about 10⁻¹⁵.
+5. **Compared state by state,** the results challenge common intuitions: faster algs can add moves (PLL angles, +0.39), a greedy rule can lose to making no choice (4.9% of states), and ZB's advantage (7.22) comes mainly from guaranteeing the good state.
+
+## Page budget
+
+| Section | Pages | Change from suggested budget |
+|---|---:|---|
+| 1. Introduction, aim, prediction | 1 | |
+| 2. Scope, definitions, model | 2 | |
+| 3. Baseline distributions | 2 | |
+| 4. Combining distributions: polynomials and DFT | 3.5 | |
+| 5. Techniques and the failure of independence | 3.5 | +0.5: this is the analytic core |
+| 6. Results and comparison | 1.5 | −0.5: Section 5 already interprets most results, so this is one table and two figures |
+| 7. Validation, reflection, conclusion | 2 | |
+| **Total** | **15.5** | Appendix tables do not count towards the argument, but check whether your limit includes them |
+
+## Still needed from you
+
+Everything that testing could settle is settled. These are left because they are yours:
+
+| Item | Why it can't come from me |
+|---|---|
+| `[NEEDED FROM AUTHOR]` Your honest prediction, and its timing | Section 1. Must be what you actually expected. See the note there |
+| `[NEEDED FROM AUTHOR]` Your story of chaining convolutions and learning the DFT | Section 1. Your voice and your experience |
+| `[NEEDED FROM AUTHOR]` A hand-worked version of the 4-point DFT | Section 4. Answer checks are in the findings; the working must be yours |
+| `[NEEDED FROM AUTHOR]` Confidence with the bridge from your table method to the summation formula | Section 4. `CLAUDE.md` flags this as something you must understand before submitting |
+| `[NEEDED FROM AUTHOR]` Line spacing, citation style, whether appendices count towards length | Assignment rules I don't have |
+| `[NEEDED FROM AUTHOR]` Which of the optional items to cut if over length | Judgement call; suggested cuts are in Section 6 |
+
+Two decisions where I picked a default that you may want to change (`RESEARCH_FINDINGS.md` section 10 lists all assumptions):
+- Reporting speed-gated angles *and* fewest-move angles side by side, rather than one as the headline.
+- Applying the two-step rule at every real decision: insert, COLL vs OLL, and OLL alternates.
 
 ---
 
-## Section 1: Introduction, Motivation, and Aims
+## Section 1: Introduction, aim, prediction
 
-**Purpose and Claim:**
-Establish the author's genuine dissatisfaction with pairwise convolution, frame the DFT as a motivated solution, and state the research question clearly. Ground the problem in speedcubing practice without overstating generality.
+**Purpose and claim:** Establishes why the question matters to you and what will be measured. Claims that the comparison needs whole distributions, not just averages.
 
 **Pages:** 1
 
-**Key Content:**
-- Opening: Author's motivation—chaining pairwise convolutions is inelegant, and the desire to combine all distributions at once led to learning the DFT by hand.
-- Statement of the research question.
-- Preview of scope: last slot and last layer only, movecount as the metric.
-- A clear, testable aim: compare baseline CFOP (with AUFs) to each technique under a consistent framework, reporting full distributions and mean moves saved.
-- Distinction between movecount and solve time; note this in the scope and reflection.
+**Key content:**
+- Your dissatisfaction with chaining pairwise convolutions, leading to the DFT.
+- The research question.
+- Scope in one sentence: FR last slot and last layer, in STM.
+- Why these steps: your stated view that the cross and first three pairs are not deterministic enough to model well.
+- Movecount is not time, and this will come back.
 
-**Math Shown vs. Summarized:**
-Minimal math in this section. No equations needed yet.
+**Math shown vs. summarized:** None yet, beyond naming T as total moves.
 
-**Visuals:**
-Optional: a single cube diagram showing the last pair and last layer, labeling the phases (pre-AUF, OLL, pre-AUF, PLL, post-AUF) to orient the reader.
+**Visuals:** Optional diagram of the seven-step sequence. Don't spend much space on it.
 
-**Data Needed:**
-- Author's personal story (motivation for DFT).
-- Clear statement of the research question.
+**Data needed:** `[NEEDED FROM AUTHOR]` your motivation story.
 
-**Personal Engagement:**
-The author's dissatisfaction with prior approaches is the heart of the motivation. Frame this authentically: what did the pairwise approach feel like to learn, and what appealed about combining all at once?
+**Personal engagement:** Your real story, and a prediction. Natural things to predict are which technique saves most per alg, and whether "two-step" would ever do worse than no choice. **Only state a prediction you truly made before seeing these results.** If you did not make one, say so, and instead describe what you would have guessed and which result surprised you most. An honest surprise earns more than a retrofitted prediction, and an examiner may probe it.
 
-**Reflection:**
-Note upfront that movecount is not time. AUF (adjustment of upper face) is performed between steps and is not the same as rotation or inspection time. This distinction will be revisited in the conclusion.
+**Reflection:** Flag that the DFT was chosen for structural reasons (see Section 4), so you are not claiming a speed benefit at these sizes.
 
-**Rubric Served:**
-- Organization: clear aim and question.
-- Personal engagement: authentic motivation, not decoration.
-- Reflection: acknowledges the movecount/time gap.
+**Rubric:** Organization (clear aim), Personal engagement.
 
-**Transition:**
-"To compare these techniques rigorously, we need a clear model of the baseline CFOP method, exact definitions of each variant, and a consistent metric. The rest of this paper builds that model, introduces the DFT as a tool, and tests each technique against the baseline."
+**Transition:** To compare anything, a solve must first become something countable.
 
 ---
 
-## Section 2: Scope, Definitions, and Model Assumptions
+## Section 2: Scope, definitions, model
 
-**Purpose and Claim:**
-Define the baseline sequence, the metric, the techniques being compared, and the state assumptions. Make all modeling choices explicit so the reader can judge their reasonableness.
+**Purpose and claim:** Fixes the metric, state space, algorithm rule and the techniques. Claims that the whole problem can be enumerated exactly, so results carry no sampling error.
 
 **Pages:** 2
 
-**Key Content:**
+**Key content:**
+- **STM:** every face, wide or slice turn is 1 (U2 = 1); rotations are 0.
+- **State space, as a counting argument:** 62,208 last-layer states (4! · 3³ · 4! · 2³ / 2) × 150 FR pair placements (5 · 3 · 5 · 2) = **9,331,200**. Also 216 orientation patterns × 288 permutations = 62,208, which is used later.
+- **Baseline sequence:** the seven steps.
+- **Alg rule:** most upvoted; alternates are those ranked at least as fast.
+- **Technique table:** U2 insert (`U R U2 R'`), sledge (`U' R' F R F'`), both replacing `R U' R'`; angles; cancellations; COLL; ZBLS + ZBLL; plus the two-step rule as the decision method.
+- **Uniform assumption,** stated plainly and marked for testing in Section 7.
 
-**Subsection 2.1: Metric and Baseline Sequence**
-- Define face turn metric (FTM): each face turn counts as 1 move, U2 counts as 1 move (not 2).
-- List the baseline sequence:
-  1. Pre-AUF for last pair
-  2. Last pair insertion
-  3. Pre-AUF for OLL
-  4. OLL (orientation of last layer)
-  5. Pre-AUF for PLL
-  6. PLL (permutation of last layer)
-  7. Post-AUF for PLL (optional, if needed for the next solve)
-- State the AUF distribution: P(0 moves) = 0.25, P(1 move) = 0.75. Justify this distribution (from practice data or a stated assumption). 
-- Note that this requires U2 to count as 1, and confirm that all data (F2L, OLL, PLL, AUF) use the same metric.
+**Math shown vs. summarized:** Show the state count in full. Summarize the data processing in a sentence each.
 
-**Subsection 2.2: Scope Limitations**
-- Exclude the cross and first three pairs (F2L) from optimization. Rationale: the author judges these as not deterministic enough to model well. Acknowledge this simplification: a complete system would model all phases.
-- Focus narrowly on the last slot (last pair insertion, including any pre-AUF) and last layer (OLL, PLL, and AUFs around them).
-- State that the model assumes last-slot and last-layer states are uniformly random after the first three pairs. Justify this assumption or flag it for empirical validation.
+**Visuals:** Technique table (one row each: definition, what it changes, how it's modelled). Small example of `R U' R'` vs `U R U2 R'` from one pair state.
 
-**Subsection 2.3: Techniques and Their Definitions**
-Create a table with:
-| Technique | Working Definition | Modeling Note | Needs |
-|---|---|---|---|
-| Two-step choice rule | At a decision, choose the option minimizing the combined moves of this step and the next | Greedy; may miss a better three-step choice. Defines the decision boundary (e.g., when is a sledge worth the OLL cost?). | Algorithm cost for each option; decision rule tie-break. |
-| U2 insert | Insert variant, algorithms TBD | Exact algorithms needed. Compare to standard insert. | `[NEEDED FROM AUTHOR]` |
-| Sledge insert | R' F R F' pair insertion, which may change last-layer edge orientation | Requires edge-orientation model. | Edge-orientation change rules. |
-| Alternate OLL and PLL angles | Use other algorithm angles to reduce total moves | Simulation of available angles. | Full algorithm sets for OLL and PLL, with move counts per angle. |
-| Cancellations | Moves at a step boundary merge or disappear (e.g., U + U → U2, or U + U' → ∅) | Requires actual algorithm strings, not just move counts. Breaks independence. | F2L insertion result (exact move sequence), followed by OLL/PLL algorithm. |
-| COLL as an OLL choice | Available when edges are oriented; solves corners and leaves EPLL | Changes the next-step distribution. Conditional on edge orientation. | COLL algorithms and move counts; EPLL distribution. |
-| ZBLS + ZBLL vs. OLL + PLL | Last slot with edge orientation, then one-look last layer | Whole-system alternative. Compare against standard CFOP on the same scrambles. | ZBLS and ZBLL case counts (302 + 493 = 795 cases total), move counts per case; edge orientation assumptions. |
+**Data needed:** All available. Source: `RESEARCH_FINDINGS.md` section 2.
 
-**Subsection 2.4: Data Sources and Assumptions**
-- F2L algorithm data: source and whether setup AUFs are included or modeled separately. Note any differences from real solves.
-- OLL and PLL distributions: source (author states they match practice).
-- AUF distribution: source and justification for P(0) = 0.25, P(1) = 0.75.
+**Personal engagement:**
+- Finding the double-count: SpeedCubeDB writes `U R U' R'`, with the AUF inside the alg. Stripping that was a real modelling decision.
+- Finding that only 164 of 622 listed F2L algs are for FR, and that simulation rather than labels is what told them apart.
+- Your choice of FR only. Pros end at FR 42% of the time.
 
-**Math Shown vs. Summarized:**
-Notation for distributions (e.g., $X_{\text{AUF}}$ for the AUF random variable) and the formal table of techniques. Equations for the baseline sequence:
-$$T_{\text{baseline}} = T_{\text{pre-AUF-LP}} + T_{\text{LP}} + T_{\text{pre-AUF-OLL}} + T_{\text{OLL}} + T_{\text{pre-AUF-PLL}} + T_{\text{PLL}} + T_{\text{post-AUF-PLL}}$$
+**Reflection:** Limits of "most upvoted" as a definition of "standard": it represents a community, and ZBLS and OLLCP barely have votes. Enumeration replaces sampling, but only for the idealized solver.
 
-**Visuals:**
-- Table of techniques (as above).
-- Optional: flowchart or diagram of the baseline sequence, showing where AUFs are applied.
+**Rubric:** Mathematical communication, Organization.
 
-**Data Needed:**
-- Confirmation of FTM metric.
-- F2L algorithm movecount data (or clarification of whether it is already provided).
-- OLL and PLL movecount distributions or full case tables.
-- AUF distribution parameters.
-- Exact U2 insert and standard insert algorithms.
-
-**Personal Engagement:**
-Why did the author choose last slot and last layer? Was there a specific problem with the other phases, or is it a natural focus for a speedcuber? Invite the author to comment on the realism of the uniform-state assumption.
-
-**Reflection:**
-- F2L algorithm data may differ from real solves (setup moves, rotations, lookahead penalties). Acknowledge that the model assumes optimal, pre-selected F2L.
-- The uniform-state assumption is strong: if certain F2L solutions are more common, last-layer state distributions may skew. Flag for later validation.
-- Excluding the cross and first three pairs means the full movecount improvement is underestimated; the paper addresses last-layer optimizations in isolation.
-
-**Rubric Served:**
-- Organization: clear definitions and scope.
-- Mathematical communication: formal notation for steps, clear table of techniques.
-- Reflection: limitations of F2L data and state uniformity.
-
-**Transition:**
-"Now that the scope and techniques are clear, we need to model the movecount distribution of the baseline sequence. The next section introduces the distributions for each step and shows how to combine them when the steps are independent."
+**Transition:** With states and algs fixed, each step has a distribution.
 
 ---
 
-## Section 3: Baseline Distributions and Independent Steps
+## Section 3: Baseline distributions
 
-**Purpose and Claim:**
-Present the empirical or algorithmic movecount distribution for each step (pre-AUFs, OLL, PLL, post-AUF), verify that the assumption of independence holds for the baseline, and derive the combined distribution through convolution.
+**Purpose and claim:** Builds the step distributions. Claims that even the "simple" AUF has structure that a flat 0.25/0.75 misses, because of symmetry.
 
 **Pages:** 2
 
-**Key Content:**
+**Key content:**
+- Case probabilities come from symmetry: OLL skip 1/216, PLL skip 1/72. N perm and H perm have 4 states, E and Z have 8, others 16.
+- Means: F2L alg 7.09, OLL alg 9.58, PLL alg 12.88.
+- **Your flat AUF vs exact:**
 
-**Subsection 3.1: Individual Step Distributions**
-For each phase, provide:
-- The distribution table (moves → probability) or a summary (mean, variance).
-- Source: F2L data, OLL cases, PLL cases, or AUF distribution.
-- A simple visualization: bar chart or histogram.
+| AUF | Exact P(0) | Decimal |
+|---|---:|---:|
+| Before last pair | 7/25 | 0.2800 |
+| Before OLL | 29/108 | 0.2685 |
+| Before PLL | 11/36 | 0.3056 |
+| After PLL | 37/144 | 0.2569 |
 
-Example structure for OLL:
-- 58 cases (including skip): $P(0) = 1/58$, $P(m_i) = \#\{\text{cases with } m_i \text{ moves}\} / 58$, etc.
-- Compute mean $E[M_{\text{OLL}}]$ and variance.
+- One worked explanation: why an N perm never needs a pre-AUF but a T perm does 3/4 of the time.
+- Blocks: last pair 7.81, OLL 10.31, PLL 14.31.
+- Means add: 32.43, exactly 350237/10800.
 
-**Subsection 3.2: Independence Check**
-- Define independence: the movecount of one step is independent of the movecount of another.
-- For the baseline (no choice rules, no edge-orientation changes, standard insertions), this assumption should hold: each step's algorithm is predetermined given the state.
-- Verify: state that the algorithm for OLL depends only on the permutation and orientation of the last layer, not on how many moves the F2L insertion took. Similarly for PLL.
-- Note: this assumption will be broken by several techniques in Section 5.
+**Math shown vs. summarized:** Show one AUF probability derived fully (7/25 is the simplest: 6 of 150 placements always need none, and 1/4 of the other 144 need none, giving 42/150). Summarize the rest in the table. Full case tables go in the appendix (`results/tables/`).
 
-**Subsection 3.3: Combining Distributions Through Convolution**
-- Informal explanation: when $X$ and $Y$ are independent, the distribution of $X + Y$ is the convolution $P(X+Y=m) = \sum_k P(X=k) P(Y=m-k)$.
-- Use the three-phase baseline to show how to combine distributions step by step:
-  1. Compute the distribution of Pre-AUF-LP + LP.
-  2. Convolve with Pre-AUF-OLL.
-  3. Convolve with OLL.
-  4. Convolve with Pre-AUF-PLL.
-  5. Convolve with PLL.
-  6. Convolve with Post-AUF-PLL.
-- Emphasize: convolution is straightforward to implement directly for these small arrays.
-- Report the final distribution: moves → probability, with mean, standard deviation, and threshold probabilities (e.g., $P(T \leq 50)$, $P(T \leq 60)$).
+**Visuals:** `fig1_blocks` (x: moves, y: probability) and the AUF table.
 
-**Math Shown vs. Summarized:**
-- Formal definition of convolution: $$(p * q)[m] = \sum_{k=0}^{m} p[k] \, q[m-k]$$
-- Example: convolve two small distributions by hand to show the reader the process.
-- Formulas for mean and variance of a sum: $E[X+Y] = E[X] + E[Y]$, and if independent, $\text{Var}(X+Y) = \text{Var}(X) + \text{Var}(Y)$.
-- Code or pseudocode for direct convolution (in an appendix or as a simple algorithm box).
+**Data needed:** `results/tables/f2l_baseline.csv`, `oll_baseline.csv`, `pll_baseline.csv`. All available.
 
-**Visuals:**
-- Bar charts for each individual step distribution (Pre-AUF-LP, LP, Pre-AUF-OLL, OLL, Pre-AUF-PLL, PLL, Post-AUF-PLL).
-- One step-by-step visualization showing how convolution combines two distributions (e.g., Pre-AUF-LP * LP).
-- Final baseline distribution with labeled axes (moves on x-axis, probability on y-axis), including mean and marked thresholds.
+**Personal engagement:** Your original 0.25/0.75 figure was a sensible estimate. Testing it and discovering where it breaks, then explaining *why*, is exactly the "testing predictions" the rubric rewards. Also: predict which cases deviate before reading the table, then check it on a real cube.
 
-**Data Needed:**
-- F2L algorithm movecount data (with pre-AUF included or excluded—must be explicit).
-- OLL and PLL case distributions.
-- AUF distribution.
+**Reflection:** Is 0.25/0.75 "wrong"? Its effect on the mean is +0.11 moves out of 32. It's a fine approximation for a mean, and worse for tails (P(T ≤ 20) off by 15%). Whether an error matters depends on what you ask.
 
-**Personal Engagement:**
-Ask the author: which single step varies the most in movecount? Does the baseline feel like their solves (e.g., OLL as the most variable phase)? Invite them to predict whether the final distribution looks more like OLL or like a mix.
+**Rubric:** Use of mathematics, Personal engagement, Reflection.
 
-**Reflection:**
-- The direct convolution approach is simple and transparent for these problem sizes. The DFT is not required here but will be valuable for complex techniques with many states.
-- The independence assumption is strong but appropriate for the baseline. It will fail for the techniques in Section 5.
-
-**Rubric Served:**
-- Mathematical communication: clear presentation of distributions, convolution definition, and formulas.
-- Use of mathematics: convolution is the natural and rigorous tool for independent sums.
-- Reflection: recognizes the limits of direct convolution and previews the DFT.
-
-**Transition:**
-"The baseline distribution is now clear. To analyze more complex techniques that involve choice rules and cascading effects, we need a more efficient and elegant framework. The next section introduces the discrete Fourier transform as a tool for understanding convolution, and shows why it will help us handle multiple interacting steps."
+**Transition:** You now have seven distributions to combine, and this is where chaining convolutions felt inadequate.
 
 ---
 
-## Section 4: Polynomials, Convolution, and the Discrete Fourier Transform
+## Section 4: Combining distributions: polynomials and the DFT
 
-**Purpose and Claim:**
-Introduce the DFT as a natural tool for combining multiple independent distributions. Show why the DFT works (polynomial evaluation), work through a complete hand example, and bridge from the table method (direct convolution) to the formula-based approach (DFT).
+**Purpose and claim:** Develops the DFT from your own route (polynomial evaluation and systems of equations), and proves when it applies.
 
-**Pages:** 3
+**Pages:** 3.5
 
-**Key Content:**
+**Key content, in this order:**
+1. **Distribution as polynomial:** P(z) = Σ pₘ zᵐ. Adding independent variables means multiplying polynomials.
+2. **Why values multiply:** E[z^(X+Y)] = E[z^X] E[z^Y] for independent X, Y.
+3. **Independence, proved rather than assumed** (the bijection argument). This is your strongest piece of original mathematics.
+   - Last pair vs last layer: for a fixed placement and alg, states map one-to-one, so uniform stays uniform.
+   - OLL vs PLL: 216 patterns of 288 states; each pattern's alg maps its 288 states one-to-one onto the 288 oriented states.
+   - Separate AUFs fail this, and the exact tests confirm both results. So group the AUF with its alg.
+4. **Evaluate at roots of unity.** Why those points: they are the ones where the inverse is simple.
+5. **Inverse by solving the system through cancellation,** including why dividing by N appears.
+6. **The bridge** from your table method to the summation formula, in one short step. `[NEEDED FROM AUTHOR]` confidence with this.
+7. **Hand example:** a = [0.25, 0.75, 0, 0], cubed.
 
-**Subsection 4.1: Distributions as Polynomials**
-- A distribution $p = [p_0, p_1, \ldots, p_n]$ can be represented as a polynomial:
-$$P(z) = p_0 + p_1 z + p_2 z^2 + \cdots + p_n z^n$$
-where the coefficient of $z^k$ is the probability of $k$ moves.
-- Example: the AUF distribution $p_{\text{AUF}} = [0.25, 0.75]$ is $P_{\text{AUF}}(z) = 0.25 + 0.75z$.
-- Convolution in the probability domain corresponds to polynomial multiplication: $(p * q)(m) = [P(z) \cdot Q(z)]_m$, the coefficient of $z^m$ in the product.
+| Point | A | A³ |
+|---|---|---|
+| 1 | 1 | 1 |
+| −i | 0.25 − 0.75i | −0.40625 + 0.28125i |
+| −1 | −0.5 | −0.125 |
+| i | 0.25 + 0.75i | −0.40625 − 0.28125i |
 
-**Subsection 4.2: Why Polynomial Multiplication Works for Independent Sums**
-- For independent random variables $X$ and $Y$ with distributions $p$ and $q$:
-$$E[z^{X+Y}] = E[z^X] E[z^Y] = P(z) \cdot Q(z)$$
-where $E[z^X] = \sum_k p_k z^k = P(z)$.
-- The coefficient of $z^m$ in $P(z) Q(z)$ is $P(T=m)$ where $T = X + Y$.
-- This is the generating function view: the polynomial encodes all moments and probabilities.
+   Inverse: [1/64, 9/64, 27/64, 27/64], which is Binomial(3, 0.75), a neat connection worth stating.
+8. **Padding:** N ≥ 12 + 15 + 22 + 1 = 50, shown by failing. N = 40 gives distance 0.049 and a plausible-looking mean of 30.48; N = 32 reads as a mean of 12.90.
+9. **Applying it:** DFT of the three blocks gives the baseline. Agreement with full enumeration: 3 × 10⁻¹⁵. Compare with flat AUFs: 0.0093.
+10. **Why the error isn't fixed by correct AUF numbers:** with exact marginals, the mean is right, but the distance stays 0.0093. The dependence is the real error.
 
-**Subsection 4.3: Direct Polynomial Multiplication (Table Method)**
-- Show the standard convolution algorithm as table multiplication, using the three-AUF example:
-  - Multiply $[0.25, 0.75]$ (AUF 1) by itself to get $[0.0625, 0.375, 0.5625]$ (AUF 1 + AUF 2).
-  - Multiply by a simple distribution (e.g., LP, which may have 5-10 moves).
-  - Lay out the multiplication table and sum diagonals to form the result.
-- Note: this method is clear and fast for small arrays, but becomes laborious with many steps or large support.
+**Math shown vs. summarized:** Show items 1 to 8 in full. Direct convolution of all blocks only as a one-line check. Mention the FFT in one sentence at most.
 
-**Subsection 4.4: The Discrete Fourier Transform**
-- **Motivation:** To avoid repeated polynomial multiplications, we can evaluate the polynomial at specific points (roots of unity), multiply the values, and then recover the polynomial coefficients.
-- **Definition:** For a discrete distribution of length $N$, the DFT is:
-$$\hat{p}[j] = \sum_{m=0}^{N-1} p[m] \, e^{-2\pi i j m / N}, \quad j = 0, 1, \ldots, N-1$$
-where $e^{-2\pi i j m / N}$ are the $N$-th roots of unity.
-- **Interpretation:** $\hat{p}[j] = P(\omega_j)$ where $\omega_j = e^{2\pi i j / N}$ is an $N$-th root of unity.
-- **Key fact (with proof sketch):** If $T = X + Y$ are independent, then:
-$$\hat{p * q}[j] = \hat{p}[j] \cdot \hat{q}[j]$$
-Proof: The convolution $(p * q)$ corresponds to the product polynomial $P(z) Q(z)$. Evaluating at a root of unity: $[P(z) Q(z)]|_{z=\omega_j} = P(\omega_j) Q(\omega_j)$.
+**Visuals:** `fig3_wraparound` (x: index read as total moves, y: probability). `fig2_flat_auf_error` (left: both distributions; right: the error in percentage points). DFT table above.
 
-**Subsection 4.5: The Inverse DFT**
-- To recover the coefficients from the DFT values, use:
-$$p[m] = \frac{1}{N} \sum_{j=0}^{N-1} \hat{p}[j] \, e^{2\pi i j m / N}$$
-- Derive this briefly by solving the system of $N$ linear equations (the forward DFT) for the $N$ unknowns $p[m]$.
-- Explain why the normalization factor $1/N$ appears: each root of unity is a column in the Vandermonde matrix, and the inverse involves dividing by the number of evaluation points.
+**Data needed:** All available, `results/results.json`. `[NEEDED FROM AUTHOR]` your own hand working.
 
-**Subsection 4.6: A Worked 4-Point Example**
-- Use the three-flat-AUF distribution: $p = [0.25, 0.75, 0, 0]$ (can represent AUF, or a sum of three AUFs if scaled).
-- Compute the DFT by hand:
-  - $\hat{p}[0] = 0.25 + 0.75 + 0 + 0 = 1$ (sum of all probabilities).
-  - $\hat{p}[1] = 0.25 + 0.75 e^{-\pi i / 2} + 0 + 0 = 0.25 - 0.75 i$.
-  - $\hat{p}[2] = 0.25 + 0.75 e^{-\pi i} + 0 + 0 = 0.25 - 0.75 = -0.5$.
-  - $\hat{p}[3] = 0.25 + 0.75 e^{-3\pi i / 2} + 0 + 0 = 0.25 + 0.75 i$.
-- Multiply two copies: $\hat{r}[j] = \hat{p}[j]^2$.
-- Inverse transform to recover $r[m]$ (the convolution of $p$ with itself).
-- Verify: $r$ should have support on $\{0, 1, 2\}$ and sum to 1.
-- **Connection to binomial:** If the three AUFs are i.i.d. Bernoulli (0 or 1 move), their sum follows a binomial distribution. Relate the result to $\text{Binomial}(3, 0.75)$ and note that $E[r] = 3 \times E[p] = 3 \times 0.75 = 2.25$.
+**Personal engagement:** Your whole route is personal: you came at this through polynomial evaluation rather than the textbook formula. Show that route rather than reproducing a standard derivation. The N = 40 failure is a good place to show a mistake you'd want to catch.
 
-**Subsection 4.7: Bridge from Table Method to Formula**
-- Summarize: the table method (Section 3.3) computes convolution directly. The DFT reformulates the problem as:
-  1. Forward transform: evaluate each polynomial at roots of unity.
-  2. Pointwise multiply: $\hat{r}[j] = \hat{p}[j] \cdot \hat{q}[j]$.
-  3. Inverse transform: solve for the coefficients of the product.
-- Why is this useful? For many independent steps, the table method requires $(m_1 + m_2)(n_1 + n_2) + \cdots$ multiplications (composition tree). The DFT converts all multiplications to pointwise products, all $O(N)$, and requires only one forward and one inverse transform (both $O(N \log N)$ with FFT, or $O(N^2)$ with direct DFT).
-- For this paper's problem size ($N \sim 100-200$), direct DFT is feasible; FFT is an acceleration but not necessary.
+**Reflection:** Honest justification. At N = 50, direct convolution is entirely manageable, and the DFT is not needed for speed. Its value is structural: all distributions combined at once, each evaluation point turning convolution into multiplication. Say this plainly; that is the claim your motivation can support.
 
-**Math Shown vs. Summarized:**
-- Full derivations:
-  - Polynomial to convolution (why multiplying polynomials gives convolution).
-  - The independence fact: $E[z^{X+Y}] = E[z^X] E[z^Y]$ (concise proof).
-  - The inverse DFT formula and its justification via linear algebra (briefly).
-  - The 4-point worked example in full.
-- Summarized or in appendix:
-  - FFT algorithm (mention but do not derive; note that it reduces complexity from $O(N^2)$ to $O(N \log N)$).
-  - Numerical stability and rounding errors.
+**Rubric:** Use of mathematics (sophistication, rigour), Personal engagement, Mathematical communication.
 
-**Visuals:**
-- One diagram showing the polynomial evaluation at roots of unity in the complex plane (circle with $N$ points labeled $\omega_j$).
-- Step-by-step table for the 4-point example showing forward DFT values, pointwise product, inverse DFT, and final result.
-- (Optional) A graph comparing the table method (time complexity) and DFT method for increasing $N$, labeling the practical crossover point.
-
-**Data Needed:**
-- None beyond what was given in Section 3 (the baseline distributions).
-
-**Personal Engagement:**
-The author learned the DFT from polynomial evaluation and systems of equations. Ask them: which step in the 4-point example felt clearest? Did multiplying the polynomials (evaluation, multiplication, solving) feel more natural than the convolution formula? Encourage them to write a sentence on why the DFT approach appealed: elegance, clarity, or the insight that independent steps multiply at each frequency?
-
-**Reflection:**
-- For this problem, the DFT is not a necessity—direct convolution is fast enough. The value lies in structure: it reveals why independent steps multiply (a conceptual insight), and it generalizes to more complex scenarios (changing the state, or convolving many steps at once).
-- The 4-point example links to the binomial distribution, illustrating that the DFT is a general tool for understanding sums of random variables, not just a computational trick.
-- Rounding and numerical stability are not addressed in full detail here; for a full implementation, one would track precision.
-
-**Rubric Served:**
-- Mathematical communication: rigorous treatment of polynomials, DFT definition, and formulas.
-- Use of mathematics: the DFT is sophisticated and appropriate; it is used to justify and generalize the convolution approach.
-- Reflection: acknowledges that the DFT is elegant but not strictly necessary for the baseline; previews why it matters for the next section.
-- Personal engagement: author's own learning path is honored; invitation to reflect on mathematical appeal.
-
-**Transition:**
-"With the DFT in hand, we have an elegant and powerful framework for combining independent steps. However, the most interesting techniques for reducing movecount violate independence: choice rules, cancellations, and edge-orientation changes all create dependencies. The next section examines each technique, identifies where independence breaks, and chooses the right model—simulation, state-by-state analysis, or careful pairing—for each one."
+**Transition:** That solves your original problem. But it relied on independence, and the techniques you most care about are designed to link steps.
 
 ---
 
-## Section 5: Techniques and the Failure of Independence
+## Section 5: Techniques and the failure of independence
 
-**Purpose and Claim:**
-Examine each technique to determine whether independence holds, and choose an appropriate model (analytic, conditional convolution, or simulation) for each one. Demonstrate that the most interesting improvements require abandoning the simple DFT and embracing more detailed state-level reasoning.
+**Purpose and claim:** The analytic turning point. Claims a precise rule: convolution of blocks stays exact unless a decision or a merge uses information from across a step boundary.
 
-**Pages:** 3
+**Pages:** 3.5
 
-**Key Content:**
+**Key content:**
 
-**Subsection 5.1: Two-Step Choice Rule**
-- **Definition:** At each decision point (e.g., after inserting the F2L pair, or after OLL), choose the option that minimizes the combined moves of this step and the next step. For example, a sledge that adds 2 moves but saves 1 in OLL is worth it.
-- **Independence issue:** The choice depends on the state (which edge/corner cases arise), not just marginal distributions. The distribution of OLL moves is no longer independent of the choice made at the F2L/LP boundary.
-- **Model:** State-by-state enumeration. For each state $s$ after the last pair, compute the total cost of each option and choose the minimum. The resulting distribution is a mixture:
-$$P(T = m) = \sum_s P(s) \cdot P_{\text{chosen option in state } s}(T = m \mid s)$$
-where the sum is over all states $s$ and each state's chosen option is predetermined.
-- **Scope:** Apply at the last pair (choice of insertion technique) and OLL (choice of algorithm angle). Clarify with the author: is the rule applied at the PLL step as well, or only at these two boundaries?
-- **Data needed:** For each state (e.g., last-pair orientation and position), the cost of each option (standard insert, sledge insert, U2 insert, etc.) and the resulting OLL distribution. This requires enumerating states and linking them to algorithms.
-- **Visualization:** Histogram showing the distribution under the choice rule vs. the baseline. Overlay or side-by-side comparison.
+**5.1 The dividing line.** Table of techniques with convolution error:
 
-**Subsection 5.2: Sledge Insert and Edge-Orientation Changes**
-- **Definition:** The sledge insert $R' F R F'$ can change the orientation of the last-layer edges (specifically, flipping the edges at the F2L-insertion boundary). This is a form of partial edge control.
-- **Independence issue:** The distribution of OLL moves depends on whether the edges are oriented or not. If the sledge flips an edge, $P(\text{OLL} \mid \text{edge flipped})$ is different from $P(\text{OLL})$ (the unconditional distribution).
-- **Probability:** Without explicit edge control, oriented edges occur in $1/8$ of random solves. If the sledge flips an edge from oriented to flipped (or vice versa), the conditional distribution shifts.
-- **Model:** Enumerate the edge states before and after the sledge. Compute the conditional distribution of OLL given edge orientation. Then convolve:
-$$P(T = m) = P(\text{edges stay oriented}) \cdot [P_{\text{OLL} \mid \text{oriented}}(m_1) \cdots ] + P(\text{edges flip}) \cdot [P_{\text{OLL} \mid \text{flipped}}(m_1) \cdots]$$
-- **Data needed:** Exact behavior of each insert type (standard, sledge, U2) on edge orientation. Conditional OLL distributions.
-- **Visualization:** Stacked or grouped bars showing OLL moves under sledge (edge flipped) vs. baseline (edges as they are).
+| Stays exact (~10⁻¹⁵) | Breaks |
+|---|---|
+| Blind insert swap | Two-step inserts (0.019) |
+| Speed-gated angles | Full look-ahead (0.037) |
+| Fewest-move angles, per step | Cancellations (0.0031) |
+| | OLL angles, two-step (0.030) |
+| | COLL, two-step (0.013) |
+| | OLLCP, two-step (0.073) |
 
-**Subsection 5.3: Cancellations at Step Boundaries**
-- **Definition:** Consecutive steps may share a move in opposite directions (e.g., the last move of F2L is $U$, the first move of OLL is $U'$), which cancel to nothing; or two $U$ moves become $U2$, reducing the total.
-- **Independence issue:** The distribution of (F2L moves + OLL moves) is not the convolution of the marginals if the last and first moves can cancel. The joint distribution requires enumerating the sequences, not just the counts.
-- **Model:** Simulation or full enumeration. For each case in the problem space (e.g., each starting orientation after the first three pairs), execute the exact algorithms and count the total movecount, including cancellations. No convolution; direct computation of the full distribution.
-- **Data needed:** Exact algorithm sequences (not just move counts) for F2L, OLL, PLL. Method to identify and resolve cancellations.
-- **Comment:** Cancellations are particularly important if the author has observed significant time savings from them in practice, but they complicate the analysis significantly. Clarify with the author whether cancellations are applied to all techniques or tested separately.
-- **Visualization:** Histogram comparing baseline (no cancellations) to baseline-with-cancellations, and then to each technique-with-cancellations.
+This corrects the project's starting assumption that alternate angles break independence. They change an alg, but they never look across the boundary.
 
-**Subsection 5.4: Alternate OLL and PLL Angles**
-- **Definition:** For some last-layer cases, multiple algorithms are known, each with a different movecount. By simulating which angles are available and selecting the shortest (or a random shortest), the expected movecount can be reduced.
-- **Independence issue:** The choice depends on the case (which of the 58 OLL cases, which of the 22 PLL cases), not on a global distribution. Each case has its own set of available angles.
-- **Model:** For each case, enumerate the available algorithms and their movecounts. Compute the expected cost as the mean (or distribution) of the shortest. Then aggregate across all cases, weighted by the case probability:
-$$P(T_{\text{OLL}} = m) = \sum_{\text{case } i} P(\text{case } i) \cdot P(m_i | \text{case } i, \text{chosen angle})$$
-- **Data needed:** Full algorithm sets for OLL and PLL, with move counts for each angle. Definition of "alternate angles" (e.g., are mirror algs considered separate?).
-- **Visualization:** Histogram of OLL/PLL moves under the angle-choice strategy vs. the baseline.
+**5.2 Choice rules: mixture over states.** P(T = m) = Σₛ P(s) · 1[min over options of total moves in s = m]. Why the mean is unharmed and the spread is not: choosing whichever is short makes steps negatively correlated, so Var(sum) falls below the sum of Vars. Show that explicitly for OLLCP: SD 4.60 by convolution, 3.90 true.
 
-**Subsection 5.5: COLL as an OLL Choice**
-- **Definition:** If the edges are already oriented (a 1/8 event without explicit control), COLL (corner orientation and permutation) solves the corners and leaves EPLL (edge permutation). COLL has 42 cases (or 24 without mirrors).
-- **Independence issue:** COLL is available only when edges are oriented. The decision to use COLL instead of OLL + PLL depends on the edge state. This creates a mixture distribution.
-- **Model:** Condition on edge orientation:
-$$P(T = m) = P(\text{edges oriented}) \cdot P_{\text{COLL + EPLL}}(m) + P(\text{edges not oriented}) \cdot P_{\text{OLL + PLL}}(m)$$
-Compute both COLL+EPLL and OLL+PLL movecount distributions independently (assuming they are independent once the edge state is fixed), then mix.
-- **Data needed:** COLL and EPLL move count distributions. Whether COLL results in a shorter average path than OLL+PLL.
-- **Visualization:** Stacked or overlaid histogram showing the mixture of COLL (when edges are oriented) and OLL+PLL (otherwise).
+**5.3 Inserts.** Only 14 of 41 cases (1/3 of states) can swap. Blind swapping costs moves (+0.05, +0.08). With two-step: 0.29, 0.34, together 0.49. Show `R U R' U2 + U R U2 R'` merging.
 
-**Subsection 5.6: ZBLS + ZBLL vs. OLL + PLL**
-- **Definition:** ZBLS (ZB Last Slot) orients the edges while inserting the last pair (42 cases). ZBLL (ZB Last Layer) then solves the last layer in one look (493 or 494 cases, depending on convention). Total: 595 cases (ZBLS) + 493 (ZBLL) = 1088 cases (or 1089 with skip).
-- **Independence issue:** ZBLS guarantees edge orientation, so ZBLL is always applicable. However, the comparison with CFOP (OLL + PLL) is not a convolution; it is a case-by-case choice within each starting state.
-- **Model:** For each possible cube state (or representative cases), simulate or enumerate the ZBLS + ZBLL movecount and compare to CFOP. Report the mean moves saved and the distribution of the difference. Use paired comparison: same starting state, two different techniques.
-- **Data needed:** ZBLS movecount distribution (42 cases). ZBLL movecount distribution (493 cases). Case distribution assumptions (are all 1088 cases equally likely?). Movecount data per case, or summary statistics.
-- **Comment:** ZBLS + ZBLL is a whole-system alternative; the comparison is not to just OLL + PLL, but to the last-slot + last-layer phases of CFOP. Align the scope: does the author want to compare ZBLS + ZBLL to the baseline (Section 3), or only to OLL + PLL?
-- **Visualization:** Scatter plot (x: movecount of CFOP-OLL-PLL, y: movecount of ZBLS-ZBLL) or histogram of the difference (CFOP − ZBLS+ZBLL).
+**5.4 The greedy rule's weakness.** Saves 0.49, while full look-ahead saves 1.20. Suboptimal in 14.8% of states; worse than no choice in 4.9%. Use the worked example: 1 move saved through OLL, 7 lost at PLL.
 
-**Subsection 5.7: Summary—When Independence Fails**
-- Create a table:
+**5.5 Cancellations: a formula, not a simulation.** Mean saving E[S] = Σ P(a) P(b) J(a, b). This works *because of* the Section 4 proof: 0.33114 + 0.18326 + 0.00174 = 0.51614, matching enumeration to 14 decimal places. So independence gives the mean of something that itself breaks independence. Dominant pattern: `R'` then `R`.
 
-| Technique | Independence? | Model | Computational Cost |
-|---|---|---|---|
-| Two-step choice | No | State-by-state enumeration | ~1,000 states (last-pair + F2L orient) |
-| Sledge insert | No | Conditional convolution | ~16 states (2 last-pair steps × 2 edge orient × 2 edge position) |
-| Cancellations | No | Simulation / enumeration | $O(\text{# cases} \times \text{# algorithm sequences})$ |
-| Alt. angles | No | Case-by-case optimization | ~58 OLL + 22 PLL cases |
-| COLL | Yes (within edge state) | Mixture over 2 edge states | Small |
-| ZBLS+ZBLL | No (system-level) | Paired comparison | ~1,000 representative states |
-| Baseline | Yes | DFT / convolution | Fast |
+**5.6 Angles: faster is not fewer.** Alternates average +1.5 (OLL) and +1.9 (PLL) moves. Speed-gated PLL costs 0.39 moves. Shorter-only gives +0.55. With cancellations the picture flips: +0.46 interaction, since skipping an AUF unblocks cancellations (P(no AUF before OLL) goes 0.27 → 0.46; cancellation saving 0.52 → 0.98).
 
-**Math Shown vs. Summarized:**
-- Full mixture models for COLL and sledge insert (short formulas).
-- Paired comparison formula for ZBLS+ZBLL (difference in means, effect size).
-- Pseudocode or description of enumeration / simulation for the others (not full code, but logic).
+**5.7 COLL: conditioning brings the DFT back.** Three classes, convolve within each, mix. Error 4 × 10⁻¹⁵ against 0.026 for plain convolution. This is the moment the DFT returns.
 
-**Visuals:**
-- One table (as above) summarizing when independence holds.
-- One example: detailed state-by-state decision tree for a small subset of last-pair cases under the two-step choice rule.
-- Overlaid histograms for at least three techniques: baseline, COLL, and ZBLS+ZBLL (or the two most interesting).
+**5.8 ZBLS + ZBLL.** ZBLL alone: 0.91. With ZBLS: 7.22. Why: conditioning on edges oriented has probability 1/8 unless you pay 1.50 moves to guarantee it.
 
-**Data Needed:**
-- `[NEEDED FROM AUTHOR]` Exact algorithms for U2 insert, sledge insert, standard insert.
-- `[NEEDED FROM AUTHOR]` COLL algorithm set and move counts.
-- `[NEEDED FROM AUTHOR]` ZBLS case data (42 cases, move counts, edge-orientation outcomes).
-- `[NEEDED FROM AUTHOR]` ZBLL case data (493 cases, move counts, or aggregate statistics).
-- `[NEEDED FROM AUTHOR]` Scope of two-step rule (which steps?).
-- `[NEEDED FROM AUTHOR]` Cancellation policy (all techniques, or separate test?).
+**Math shown vs. summarized:** Show in full: the mixture formula, the variance argument, E[S], the COLL mixture. Summarize individual technique calculations in the table. Cut 5.8 to a paragraph if space is short.
 
-**Personal Engagement:**
-For each technique, ask the author: Which one have you used in practice? Did it feel faster, or just theoretically interesting? Which one are you most unsure about—which model (enumeration, simulation, pairing) makes the most sense to you?
+**Visuals:** `fig9_independence_failure` (right mean, wrong tails) and `fig8_paired_saving` (x: moves saved, y: probability). Dividing-line table.
 
-**Reflection:**
-- The failure of independence for most techniques is not a flaw; it is a key insight. It shows that the simple DFT baseline is a foundation, but real optimizations are more nuanced and state-dependent.
-- The paper would be superficial if it stopped at the baseline. This section demonstrates critical thinking: recognizing where the model breaks and choosing the right tool (state-by-state analysis, simulation, paired comparison) for each situation.
-- Some techniques are tractable (COLL, sledge); others are computationally intensive (ZBLS+ZBLL with full case enumeration). The author may need to simplify or sample to fit the page budget.
+**Data needed:** All available, `RESEARCH_FINDINGS.md` sections 5 to 7.
 
-**Rubric Served:**
-- Mathematical communication: clear identification of where independence fails and appropriate choice of model.
-- Sophistication and critical reflection: recognizes both the power and limits of the DFT.
-- Relevance of mathematics: different techniques require different mathematical tools.
-- Personal engagement: author's own speedcubing experience informs which techniques are most interesting.
+**Personal engagement:**
+- Your own sledge example, made concrete: the worked scramble, done on a real cube, saves 9 moves.
+- Your own speed-ranking rule producing a result you may not have expected. Discussing that openly is strong engagement.
+- Working out *why* the angle/cancellation interaction happens, then testing it, is exactly the rubric's "making and testing predictions".
 
-**Transition:**
-"Now we have the tools and models for each technique. The next section presents the results: movecount distributions and mean moves saved for each technique, compared to the baseline. We also validate the models against real data (if available) and discuss the implications."
+**Reflection:** Limits of the two-step rule as a model of a human: it needs the OLL read before inserting, and full look-ahead needs the PLL read too, so 1.20 is a ceiling. Inserts here are limited to baseline algs ending in your forms, so 0.49 is conservative.
+
+**Rubric:** All five, mainly Use of mathematics and Reflection.
+
+**Transition:** With each technique modelled validly, they can all be put side by side.
 
 ---
 
-## Section 6: Results, Comparisons, and Validation
+## Section 6: Results and comparison
 
-**Purpose and Claim:**
-Present the movecount distributions and summary statistics for each technique, compare them to the baseline using consistent metrics, and validate the results against real solves (if available) or full enumeration / simulation. Quantify the trade-off between complexity (case count, algorithm selection) and moves saved.
-
-**Pages:** 2.5
-
-**Key Content:**
-
-**Subsection 6.1: Baseline Results**
-- Present the baseline distribution (from Section 3) with:
-  - Full histogram or bar chart (moves → probability).
-  - Mean $\mu_{\text{baseline}}$ and standard deviation $\sigma_{\text{baseline}}$.
-  - Quantiles: $P(T \leq 50)$, $P(T \leq 60)$, $P(T \leq 70)$, etc.
-  - Briefly note the contribution of each step (OLL is typically the most variable; state this if true).
-
-**Subsection 6.2: Results for Each Technique**
-For each of the six techniques (two-step rule, sledge, cancellations, alt. angles, COLL, ZBLS+ZBLL), provide:
-- Mean movecount and standard deviation.
-- Mean moves saved: $\Delta \mu = \mu_{\text{baseline}} - \mu_{\text{technique}}$.
-- Histogram or overlaid curves (technique vs. baseline).
-- Probability of saving at least 1, 2, 3 moves vs. baseline.
-- Complexity trade-off: number of additional algorithms or cases to memorize.
-- Table entry: mean, std dev, savings, and case count.
-
-Example table:
-
-| Technique | Mean Moves | Std Dev | Savings (vs. Baseline) | Additional Cases | Notes |
-|---|---:|---:|---:|---:|---|
-| Baseline | 48.2 | 5.3 | — | 0 | Reference |
-| Two-step choice | 46.8 | 5.1 | +1.4 | ~10 decision trees | Estimated; depends on insertion options |
-| Sledge insert | 47.3 | 5.5 | +0.9 | 1 alg | Edge-flip risk must be managed |
-| Cancellations | 47.0 | 5.2 | +1.2 | 0 | Requires exact sequence tracking |
-| Alt. angles | 47.6 | 5.0 | +0.6 | Varies by case | Small gains; marginal ROI |
-| COLL (1/8 chance) | 48.0 | 5.1 | +0.2 (avg) | 42 cases | Only if edges happen to be oriented |
-| ZBLS+ZBLL | 45.1 | 5.8 | +3.1 | 595 total (1088 with step 2) | Whole-system alternative; high investment |
-
-**Subsection 6.3: Paired Comparisons**
-For techniques that modify a subset of cases (e.g., two-step rule at the last pair, or COLL when edges are oriented), show:
-- The subset's baseline cost and the technique's cost.
-- Effect size: percentage improvement for cases where the technique applies.
-
-Example:
-"Among last-pair insertions, the sledge saves an average of 0.9 moves. However, the sledge applies to all cases, while COLL applies only when edges are oriented (1/8 probability). If edges are flipped by the sledge, the overall OLL distribution changes, potentially offsetting the initial saving."
-
-**Subsection 6.4: Validation**
-Choose one of the following, depending on data availability:
-
-*Option A (Full Enumeration / Simulation):*
-- Describe the simulation: for each starting state (e.g., 1,000 random cube states after the first three pairs), execute the baseline and each technique, and record the movecount.
-- Report: mean and standard deviation across the sample. Confidence intervals (95% CI) for the mean.
-- Compare to analytic results: do the simulated means match the convolution / DFT predictions within the confidence interval?
-
-*Option B (Real Reconstructed Solves):*
-- If the author has recorded and analyzed their own solves (e.g., with move sequences), compare the model to real solves.
-- Analyze the discrepancy: Are there systematic differences (e.g., the model overestimates OLL, underestimates insertion choices)? Are they due to lookahead, fatigue, or algorithmic suboptimality?
-- Note: the model describes an idealized solver, not a human solver.
-
-*Option C (Partial Enumeration):*
-- If full enumeration is impractical, enumerate a representative subset (e.g., 100 cases covering the range of OLL and PLL cases) and compare to the model's predictions.
-
-**Subsection 6.5: Practical Implications**
-- Summarize for a speedcuber: which techniques are worth learning?
-  - Sledge insert: small gain (+0.9), easy to learn, risk of edge disruption.
-  - Two-step choice: moderate gain (+1.4), requires decision-making.
-  - ZBLS+ZBLL: large gain (+3.1), but requires memorizing many cases.
-- Discuss the trade-off between complexity (case count, decision trees) and moves saved.
-- Are the improvements reproducible in practice (i.e., do faster solvers actually use these techniques, and do their timings reflect the movecount savings)?
-
-**Math Shown vs. Summarized:**
-- Full table of results with means, standard deviations, and effect sizes.
-- Validation method (simulation pseudocode or enumeration summary).
-- Confidence intervals and p-values (if statistical tests are performed) are optional.
-
-**Visuals:**
-- One overlay histogram or density plot showing baseline, two-step choice, sledge, and ZBLS+ZBLL for easy comparison.
-- One bar chart of mean moves saved by technique (ranked from smallest to largest gain).
-- One scatter plot (technique vs. case count) to visualize the complexity trade-off.
-- One table summarizing all results.
-
-**Data Needed:**
-- Simulation results or real-solve data for validation.
-- Algorithms and exact movecounts for all techniques.
-
-**Personal Engagement:**
-Which result surprised the author the most? Did any technique perform better or worse than expected? Did the model reveal a technique they had not considered worthwhile?
-
-**Reflection:**
-- The movecount improvements are modest compared to the added complexity for some techniques (e.g., COLL). This raises the question: are case counts the right metric for learning burden? (Recognition time, muscle memory, decision-making under fatigue all matter.)
-- The validation step is critical: if the model disagrees with real solves, the assumptions (uniform state distribution, deterministic algorithms, no lookahead) may be violated.
-- The paper can only optimize last-layer movecount; a full system optimization (cross, F2L, last layer) might show different trade-offs.
-
-**Rubric Served:**
-- Organization: results are clearly presented and compared.
-- Mathematical communication: tables, charts, and summary statistics are appropriately chosen.
-- Reflection: implications are discussed, limitations acknowledged.
-- Validation: model predictions are compared to reality.
-
-**Transition:**
-"The results show that several techniques offer small to moderate improvements, with a clear trade-off between learning burden and moves saved. Before concluding, we must reflect on the assumptions, limitations, and broader implications of the model. The final section addresses these critical questions."
-
----
-
-## Section 7: Reflection and Conclusion
-
-**Purpose and Claim:**
-Reflect critically on the assumptions, limitations, and implications of the work. Revisit the research question and explain what was learned. Discuss next steps and open questions.
+**Purpose and claim:** One compact comparison. Claims that value depends on what you count: moves, tails, or moves per alg.
 
 **Pages:** 1.5
 
-**Key Content:**
+**Key content:** Summary table (subset of `RESEARCH_FINDINGS.md` section 6):
 
-**Subsection 7.1: Critical Assumptions Revisited**
-- **Uniformity of states:** Assumed that last-slot and last-layer states are uniformly random after the first three pairs. Is this true? If certain F2L solutions are more common (e.g., faster rotationless solutions), state distributions may skew. Impact: would change the weighting of OLL/PLL cases.
-- **Deterministic algorithms:** The model assumes each case has a pre-selected algorithm. In practice, a solver might choose algorithms on the fly (lookahead, ergonomics). Impact: the "alternate angles" technique overstates the gain if good angles are already chosen.
-- **No rotations, no lookahead:** The F2L data excludes rotations (x, y, z moves) and assumes pre-selected solutions. Real solves include cube rotations and lookahead. Impact: the baseline movecount may not match wall-clock time.
-- **FTM metric:** The paper uses FTM (U2 = 1), not half-turn metric (HTM, where U2 = 2) or others. This choice affects all comparisons. Discussion: FTM is closer to human solve time (since U2 is performed as a single rotation), but HTM is more granular.
+| Technique | Mean | SD | Saved | Fewer / more (paired) | P(T ≤ 25) | Net algs |
+|---|---:|---:|---:|---:|---:|---:|
+| Baseline | 32.43 | 4.83 | | | 0.082 | 0 |
+| U2 + sledge, two-step | 31.94 | 4.76 | 0.49 | 13.0% / 4.9% | 0.095 | 0 |
+| Cancellations | 31.91 | 4.97 | 0.52 | 24.0% / 0% | 0.105 | 0 |
+| Angles, fewest moves | 31.88 | 4.73 | 0.55 | 20.9% / 3.7% | 0.091 | 48 |
+| COLL, two-step | 31.97 | 5.04 | 0.46 | 7.9% / 0% | 0.103 | 40 |
+| All CFOP, fewest moves | 30.37 | 4.92 | 2.06 | 51.4% / 5.6% | 0.161 | 88 |
+| OLLCP, two-step | 28.50 | 3.91 | 3.93 | 67.5% / 0% | 0.190 | 329 |
+| ZBLS + ZBLL | 25.21 | 3.51 | 7.22 | 87.8% / 8.1% | 0.517 | 733 |
+| 1LLL | 23.73 | 3.03 | 8.70 | 95.6% / 1.5% | 0.719 | 3,837 |
 
-**Subsection 7.2: Limitations of Scope**
-- **Last layer only:** The analysis optimizes only the last slot and last layer. A full system would include the cross and F2L, where larger improvements may be possible.
-- **No edge control in baseline:** The baseline does not explicitly control edge orientation. ZBLS, by contrast, builds edge control into the algorithm set. A fair comparison would require a parallel baseline with full edge control (e.g., ZB Full).
-- **Case assumptions:** OLL has 58 cases (including skip), PLL has 22. But in some conventions (e.g., distinguishing rotations), the case count is different. The paper's results depend on this choice.
-- **Model vs. practice:** The model describes an idealized solver. Real solves are affected by fatigue, turn speed, lookahead, and algorithm comfort. The improvements predicted by the model may not translate to faster real-world solves.
+Points to draw out:
+- **Moves per 100 algs:** OLLCP 1.19, COLL 1.16, angles 1.14, ZB 0.99, 1LLL 0.23.
+- **Full distributions matter:** ZB raises P(T ≤ 25) sixfold, from 8% to 52%, and narrows the spread too. A mean alone hides both.
+- **The stage metrics you asked for:** LS, LS + OLL, OLL + PLL, and LSLL are all in the findings table.
+- **Interactions are mostly additive,** with the angle/cancellation exception.
 
-**Subsection 7.3: Strengths and Insights**
-- **What the paper demonstrates:**
-  1. The DFT is a powerful and elegant tool for combining independent distributions. The 4-point example and polynomial interpretation make this accessible.
-  2. Independence is a critical assumption. Many interesting techniques violate it, requiring careful state-by-state or simulation-based analysis.
-  3. Most last-layer techniques offer modest improvements (0.5–3 moves), with diminishing returns as complexity increases.
-  4. The framework is general and can be extended to other optimization problems (e.g., other Rubik's cube methods, or other discrete combinatorial problems with step-by-step solutions).
-- **Personal learning:** The author set out to learn the DFT because pairwise convolution felt inelegant. The journey from polynomial multiplication to roots of unity to inverse transform is mathematically rich and conceptually satisfying.
+**Math shown vs. summarized:** Table only. Full table and factorial grid in the appendix.
 
-**Subsection 7.4: Limitations and Future Work**
-- **Full enumeration:** A complete analysis would enumerate all cube states (very large; impractical) or sample more representative cases and report confidence intervals.
-- **Real-solve validation:** Collect movecount data from real solves (via video analysis or move logging) and compare to the model. Quantify the lookahead effect.
-- **Optimization across phases:** The paper isolates last-layer optimizations. A richer project would co-optimize last-pair insertion and OLL, using a shared state model.
-- **Time vs. movecount:** Investigate the relationship between movecount and solve time (e.g., via video analysis or hand motion tracking). Are the improvements in movecount reflected in wall-clock time savings?
-- **Other methods:** The framework applies to other speedcubing methods (Roux, Petrus, ZZ). Comparing methods via this distribution-based approach is an open question.
+**Visuals:** `fig4_overlay_pmf` (one overlay). `fig7_tradeoff` (x: algs added, log scale; y: moves saved). Summary table. `fig6_moves_saved` is an optional extra if space allows, and `fig5_overlay_cdf` can replace the overlay if you want to emphasise thresholds.
 
-**Subsection 7.5: Answering the Research Question**
-- **Question:** How can probability distributions be used to compare how much last-slot and last-layer techniques reduce the movecount of a CFOP solve?
-- **Answer:** Probability distributions model the movecount of each step. For independent steps, convolution (or the DFT) combines them elegantly. For dependent techniques (choice rules, edge control, cancellations), state-by-state analysis or simulation is required. The full distribution (not just the mean) reveals the effect of techniques on the whole range of outcomes: some techniques reduce the mean, others reduce variability or eliminate outliers.
-- **Key finding:** The DFT provides a conceptually rich way to understand independent combinations, but the most interesting speedcubing techniques are not independent, requiring deeper reasoning.
+**Data needed:** All available.
 
-**Subsection 7.6: Conclusion**
-- Summarize: The paper uses probability distributions and the DFT to model last-layer movecount. The analysis is rigorous for the baseline and transparent about where and why the model breaks for advanced techniques. Several techniques offer small improvements; ZBLS+ZBLL offers a larger alternative at high memorization cost.
-- Reflection: Movecount is not time, and the improvements shown may not directly translate to faster solves. However, the framework offers a rigorous way to compare techniques and could guide solver practice.
-- Final thought: The author's original motivation—learning the DFT to elegantly combine distributions—is achieved. The DFT is the right tool for the baseline, and the limitations exposed by advanced techniques point the way toward more sophisticated models (e.g., state machines, Markov chains, simulation).
+**Personal engagement:** Which trade-off would you actually take as a solver? That's a real decision only you can make, and the numbers now support it. `[NEEDED FROM AUTHOR]`
 
-**Math Shown vs. Summarized:**
-Minimal new math. Recap the key formulas and insights from earlier sections.
+**Reflection:** "Saved per alg" treats all algs as equally hard to learn and use. Is it fair to compare a technique you can adopt tomorrow (cancellations) with 733 algs?
 
-**Visuals:**
-Optional: a concept map or flowchart showing how the different techniques fit into the framework (independent baseline, state-dependent choice rules, simulation-based techniques, etc.).
+**Rubric:** Organization (concise), Mathematical communication, Reflection.
 
-**Data Needed:**
-None beyond what was already collected.
+**Suggested cuts if over length:** OLS, ZB with shortest ZBLS, the factorial grid (keep the one interaction), and `fig6`.
 
-**Personal Engagement:**
-Reflect with the author: Was learning the DFT worth it? What surprised you most about the results? If you were to practice speedcubing based on this analysis, which techniques would you prioritize and why?
+**Transition:** These numbers describe an idealized solver. Does that solver resemble a real one?
+
+---
+
+## Section 7: Validation, reflection, conclusion
+
+**Purpose and claim:** Tests the model two ways. Claims the model is internally certain, close to pros on step lengths, wrong on which states pros face, and that comparisons between techniques are more trustworthy than absolute totals.
+
+**Pages:** 2
+
+**Key content:**
+
+**Internal validation (brief):** independent brute-force solver: 0 mismatches over 20,000 states; magiccube replay: 1000 of 1000; DFT vs enumeration agree to 10⁻¹⁵. Mention the bug the checks caught (OLL 37 into T perm cut off by a short window). It shows the validation did real work. Also state the one known gap: if a whole OLL cancels away, the pairwise model misses further merging (1 state in 61,000, worth 0.00004 moves).
+
+**Against pros:**
+
+| | Model | Pros |
+|---|---:|---:|
+| Last pair | 7.81 | 7.48 ± 0.09 |
+| OLL alg | 9.62 | 9.26 ± 0.03 |
+| PLL alg | 13.06 | 13.14 ± 0.04 |
+| Edges oriented after last pair | 12.5% | 20.1% |
+
+Uniform states are rejected: F2L p ≈ 10⁻⁵, OLL and PLL far beyond that. Two causes that can't be separated: real skill (choosing pairs, edge control), and selection (reconstructed solves skew fast).
 
 **Reflection:**
-This section is the reflection in full. It addresses limitations, acknowledges the gap between the model and reality, and highlights the insights gained. The author should demonstrate understanding of the context (speedcubing as a practice and a skill) and the limitations of the analysis (ideal solver, last-layer focus, movecount as a proxy for time).
+- **Movecount vs time, finally.** Pros pay 0.73 extra PLL moves compared with baseline algs at their own case frequencies. That's the most compelling evidence available that they are optimising something else, and your own speed-gated result says the same.
+- Recognition is free in this model.
+- What you'd do next: real-solve state distribution in place of uniform, and an estimate of recognition cost.
+- Was the DFT worth learning for this? `[NEEDED FROM AUTHOR]`. Your honest view belongs here.
 
-**Rubric Served:**
-- Organization: clear conclusion linking back to the research question.
-- Reflection: substantial and critical, throughout (this section in particular).
-- Personal engagement: author's journey and learning are honored.
-- Mathematical communication: recap of methods and their limitations.
-- Use of mathematics: the DFT is positioned as elegant and powerful, with caveats about generality.
+**Conclusion:** Answer the question directly: distributions compare techniques validly when each is combined in the way its dependence allows. Return to the DFT: it solved the problem you set it, its limits then told you more about the techniques than the DFT itself did.
 
-**Transition:**
-The paper ends here. An appendix may include:
-- Full algorithm lists for F2L, OLL, PLL, COLL, ZBLS, ZBLL.
-- Raw data tables (case-by-case movecounts, if not in the main text).
-- Simulation pseudocode or Python implementation.
-- Derivation of the inverse DFT in detail.
-- Worked examples of convolution and DFT for larger arrays.
+**Math shown vs. summarized:** χ² and binomial results as stated values only; don't develop those tests. Keep them secondary so they don't distract from the argument.
 
----
+**Visuals:** `fig10_last_pair_vs_real` (x: moves in last pair; y: probability). Model vs pros table.
 
-## Appendices (not counted in page budget)
+**Data needed:** All available. `results/real_solves.json`, `results/validation.json`.
 
-**Appendix A: Algorithm Data**
-- F2L algorithm movecount for each of the $\sim 40$ last-pair cases.
-- OLL and PLL case tables (58 OLL + 22 PLL cases, with movecount for primary angle).
-- COLL case table (42 cases, movecount).
-- ZBLS movecount per case (42 cases).
-- ZBLL movecount per case (493 cases), or a summary (mean, std dev, distribution).
+**Personal engagement:** Try the worked examples on your own cube; your own experience with whether a two-step decision is recognisable in real time is authentic evidence no dataset here gives. `[NEEDED FROM AUTHOR]`
 
-**Appendix B: Detailed Derivations**
-- Full derivation of the inverse DFT.
-- FFT algorithm (brief overview, not a full derivation).
-- Proof of independence fact: $E[z^{X+Y}] = E[z^X] E[z^Y]$.
-- Worked example: 8-point DFT.
+**Reflection:** This whole section.
 
-**Appendix C: Simulation and Computation**
-- Pseudocode or Python code for direct convolution.
-- Pseudocode for DFT (direct, not FFT).
-- Simulation pseudocode for case enumeration.
-- Verification checks (probabilities sum to 1, means match, etc.).
-
-**Appendix D: Real-Solve Data (if available)**
-- Video analysis or move logging of the author's solves.
-- Comparison of modeled vs. observed movecount.
-- Statistical summary (mean, std dev, outliers).
+**Rubric:** Reflection, Organization, Personal engagement.
 
 ---
 
-## Quality Checks
+## Appendices
 
-- ✓ Clear central argument: the DFT elegantly handles independent baseline; most interesting techniques are not independent.
-- ✓ Valid mathematical model for each technique: specified in Section 5.
-- ✓ Each use of convolution justified by independence: stated in Section 3 and revisited in Section 5.
-- ✓ Reflection and personal engagement spread throughout: author's motivation (Sec. 1), assumptions (Sec. 2), learning (Sec. 4), choices (Sec. 5), surprise (Sec. 6), and critical reflection (Sec. 7).
-- ✓ Repetitive material minimized: each section has a distinct purpose; summary tables consolidate similar information.
-- ✓ Full distributions (not just means) matter: shown in Section 3 (why threshold probabilities matter), Section 6 (histogram comparisons).
-- ✓ Page budget: 15 pages fits the guideline.
+- **A.** Full F2L, OLL and PLL tables (`results/tables/*_baseline.csv`).
+- **B.** Full technique table and factorial grid (`techniques.csv`, `factorial.csv`).
+- **C.** Code structure and how to reproduce, briefly, noting technology was used for enumeration while all key mathematics is shown by hand in the body.
 
----
+## Quality checks
 
-## Open Questions for Author (to be answered later)
-
-1. **U2 insert algorithms:** What exact algorithms are you calling "U2 insert"? How does it differ from the standard insert, and what is your preferred standard insert for comparison?
-2. **Algorithm selection:** How is one algorithm chosen among alternatives for a given case? (Shortest, random among shortest, solver preference?) Does this change per technique?
-3. **Metric finality:** Is FTM your final choice, or are you considering other metrics (HTM, QTM, STM)?
-4. **Cancellations scope:** Are cancellations applied to all techniques, or tested separately as a distinct optimization?
-5. **Two-step rule scope:** In which steps is the two-step minimization rule applied? (Last pair insertion only, OLL angle choice, PLL angle choice, or all?)
-6. **Real-solve data:** Do you have recorded solves (video or move sequences) available for validation?
-7. **Course expectations:** Are there specific requirements for line spacing, citation format, or a course rubric that constrains the paper style?
-
----
-
-## Summary
-
-This outline presents a comprehensive structure for a 15-page paper on CFOP last-layer optimization using probability distributions and the DFT. The paper's strength lies in honest treatment of the assumptions: the DFT is elegant and correct for independent steps, but the most interesting techniques break independence, requiring careful state-by-state or simulation-based reasoning. The structure encourages the author to engage deeply with the mathematics, reflect critically on the results, and communicate findings clearly to a reader unfamiliar with speedcubing.
-
-The page budget is tight (15 pages), so material must be focused and repetition minimized. Large data tables and detailed proofs belong in appendices. The visual elements (histograms, tables, comparison plots) should carry much of the communication.
-
-The outline is ready for the author to fill in with data, computations, and final decisions on the open questions above.
+| Check | Status |
+|---|---|
+| Clear central argument, not a list of techniques | Yes: the dividing line, and its consequences |
+| Every technique has a valid mathematical model | Yes: all exact, section 5 of the findings gives the type |
+| Each use of convolution justified by independence | Yes: proved in Section 4, tested in 5.1 |
+| Reflection and engagement spread throughout | Yes: each section has its own |
+| Repetitive material moved to tables or appendix | Yes: case data is in the appendix |
+| Reader sees why full distributions matter | Yes: fig 9, and ZB's P(T ≤ 25) |
+| Page budget at most 16 | Yes: 15.5 |

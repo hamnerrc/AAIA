@@ -1,0 +1,16 @@
+{
+ "triples_recounted": 57356,
+ "triples_differing": 152,
+ "probability_of_such_a_state": 1.628943758573384e-05,
+ "mean_extra_moves_saved": 3.815157750342928e-05,
+ "pairwise_mean_saving": 0.5161372599451303,
+ "corrected_mean_saving": 0.5161754115226337,
+ "largest_case": [
+  4,
+  "R' F R F' R U R'",
+  "R U2 R' U' R U' R'",
+  "R U R' U R U R' F' R U R' U' R' F R2 U' R' U2 R U' R'",
+  21,
+  17
+ ]
+}

@@ -1,0 +1,33 @@
+{
+  "n_states": 20000,
+  "state_by_state_mismatches": {
+    "baseline": 0,
+    "two_step": 0,
+    "three_step": 0,
+    "cancel": 5
+  },
+  "states_checked": {
+    "baseline": 20000,
+    "cancel": 20000,
+    "two_step": 5000,
+    "three_step": 5000
+  },
+  "cancel_literal_higher_than_model": 4,
+  "cancel_literal_lower_than_model": 1,
+  "brute_sequence_did_not_solve": 0,
+  "mc_mean": 32.47055,
+  "exact_mean": 32.42935185185185,
+  "chi2_distribution": {
+    "stat": 35.957063505007376,
+    "p": 0.3316951301220565,
+    "bins": 34
+  },
+  "chi2_placements_uniform": {
+    "stat": 155.815,
+    "p": 0.3345419839647891,
+    "placements_seen": 150
+  },
+  "magiccube_replays": 1000,
+  "magiccube_solved": 1000,
+  "seconds": 342.9328269958496
+}

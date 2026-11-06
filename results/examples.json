@@ -1,0 +1,121 @@
+{
+ "two_step_loses": {
+  "note": "The two-step rule picks the option best through OLL, and the PLL it leaves is much longer.",
+  "scramble": "U' M2 U2 M U M2 U M2 U M R U2 R2 U' F' U F R2 U' R' U2 R U R' F R U R' U' F' U'",
+  "two_step_picks": "U F U R U' R' F' U R U2 R'",
+  "options": [
+   {
+    "last_pair": "U F U R U' R' F' R U' R'",
+    "oll": "U2 R U R2 F' U' F U R2 U2 R'",
+    "pll": "M' U' M2 U' M2 U' M' U2 M2 U",
+    "stm_pair": 10,
+    "stm_oll": 11,
+    "stm_pll": 10,
+    "two_step_score": 21,
+    "total": 31
+   },
+   {
+    "last_pair": "U F U R U' R' F' U R U2 R'",
+    "oll": "f R f' U' r' U' R U M'",
+    "pll": "U' R U' R' U' R U R D R' U' R D' R' U2 R' U2",
+    "stm_pair": 11,
+    "stm_oll": 9,
+    "stm_pll": 17,
+    "two_step_score": 20,
+    "total": 37
+   },
+   {
+    "last_pair": "U F U R U' R' F' U' R' F R F'",
+    "oll": "R' U' R' F R F' U R",
+    "pll": "U2 x R' U R' D2 R U' R' D2 R2 x' U'",
+    "stm_pair": 12,
+    "stm_oll": 8,
+    "stm_pll": 11,
+    "two_step_score": 20,
+    "total": 31
+   }
+  ]
+ },
+ "sledge_skips_oll": {
+  "note": "The author's own example: a longer insert that skips OLL.",
+  "scramble": "R2 F R U R U' R' F' R U2 R' U2 R U2 F R' F' R U R U' R' R U R' U' R U' R' U",
+  "options": [
+   {
+    "last_pair": "U' R U R' U R U' R'",
+    "oll": "R U R' U' R' F R F'",
+    "pll": "U2 R' U2 R U2 R' F R U R' U' R' F' R2",
+    "stm_pair": 8,
+    "stm_oll": 8,
+    "stm_pll": 14,
+    "two_step_score": 16,
+    "total": 30
+   },
+   {
+    "last_pair": "U' R U R' U2 R U2 R'",
+    "oll": "U2 r' U' R U' R' U2 r",
+    "pll": "U2 R2 U' R U' R U R' U R2 D' U R U' R' D U",
+    "stm_pair": 8,
+    "stm_oll": 8,
+    "stm_pll": 17,
+    "two_step_score": 16,
+    "total": 33
+   },
+   {
+    "last_pair": "U' R U R2 F R F'",
+    "oll": "(nothing)",
+    "pll": "U2 R' U2 R U2 R' F R U R' U' R' F' R2",
+    "stm_pair": 7,
+    "stm_oll": 0,
+    "stm_pll": 14,
+    "two_step_score": 7,
+    "total": 21
+   }
+  ]
+ },
+ "u2_shorter_total": {
+  "note": "A U2 insert that costs an extra move and gains more at OLL.",
+  "scramble": "U' M2 U' M U2 M' U' M2 U F U R U' R' F' R U2 R' U' R U' R' R U R' F R' F' R U",
+  "options": [
+   {
+    "last_pair": "U' R' F R F' R U' R'",
+    "oll": "R U R' U R U2 R' F R U R' U' F'",
+    "pll": "U' M2 U M U2 M' U M2 U",
+    "stm_pair": 8,
+    "stm_oll": 13,
+    "stm_pll": 9,
+    "two_step_score": 21,
+    "total": 30
+   },
+   {
+    "last_pair": "U' R' F R F' U R U2 R'",
+    "oll": "F R U R' U' F'",
+    "pll": "U' M2 U M U2 M' U M2 U",
+    "stm_pair": 9,
+    "stm_oll": 6,
+    "stm_pll": 9,
+    "two_step_score": 15,
+    "total": 24
+   },
+   {
+    "last_pair": "U' R' F R F' U' R' F R F'",
+    "oll": "U' f R f' U' r' U' R U M'",
+    "pll": "U' R' U R' U' R D' R' D R' U D' R2 U' R2 D R2 U'",
+    "stm_pair": 10,
+    "stm_oll": 10,
+    "stm_pll": 18,
+    "two_step_score": 20,
+    "total": 38
+   }
+  ]
+ },
+ "largest_oll_pll_cancellation": {
+  "oll_case": "OLL 37",
+  "oll_alg": "F R' F' R U R U' R'",
+  "pll_case": "T",
+  "pll_alg": "R U R' U' R' F R2 U' R' U' R U R' F'",
+  "moves_cancelled": 13,
+  "stm_written": 22,
+  "stm_after_merging": 9,
+  "probability_of_this_pair_at_this_angle": "1 in 15552"
+ }
+}
