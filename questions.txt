@@ -1,0 +1,116 @@
+QUESTIONS FOR AUTHOR
+=====================
+
+## Data Sources and Coverage
+
+1. **Spreadsheet vs. JSON data discrepancy:**
+   - The spreadsheet (LSLL distributions.xlsx) has many more cases than the JSON files in cube-simulator-and-algs/
+   - Should I use the structured JSON files from cube-simulator-and-algs/ as the source of truth, or the spreadsheet?
+   - If spreadsheet: are those the actual cases you've tested/analyzed?
+   - If JSON: why does it have fewer cases? Are some omitted or grouped differently?
+
+2. **Case counts vs. algorithm angles:**
+   - Should each case have one movecount (the "best" algorithm by some metric), or a distribution across all available angles?
+   - If multiple angles: do you want to weight them by vote count/score from the JSON, or treat them as equally likely?
+   - The paper mentions "alternate OLL and PLL angles" as a technique—should the baseline use the single best angle per case, or does it already account for angle selection?
+
+3. **Last-slot (LS) data:**
+   - The spreadsheet has ~1000 rows labeled as "LS" (last-slot insertion cases).
+   - Is this the full set of F2L last-pair cases (~40-50 expected), or are there duplicates/variants counted separately?
+   - Are these case names/labels standardized, and do they correspond to the F2L cases in your model?
+
+## Movecount Metric and Parsing
+
+4. **How to count moves from algorithm strings:**
+   - FTM: U2 counts as 1 move, spaces/modifiers are ignored?
+   - Example: "R U2 R' F R F' U2" → count = 8 moves (R, U2, R', F, R, F', U2 = 7... wait)?
+   - Should I count wide moves (r, M, u) as 1 move or 2?
+   - Should pre/post AUF moves (in the JSON, marked as 'pre' and 'post' fields) be added to the algorithm movecount, or are they tracked separately?
+
+5. **Movecount in the spreadsheet:**
+   - The spreadsheet's column E (movecount) contains formulas that count characters in the algorithm string.
+   - That formula seems to strip brackets, apostrophes, spaces, 2's, commas, colons. Is that the correct FTM count?
+   - Should I verify this parsing against the cubing standard?
+
+## AUF (Adjustment of Upper Face)
+
+6. **AUF distribution and application:**
+   - You said P(0) = 0.25, P(1) = 0.75 for AUF. Is this pre-AUF, post-AUF, or both?
+   - Should pre-AUF and post-AUF be the same distribution, or different?
+   - In the spreadsheet's "combine" sheet, AUFs are applied with mixed probabilities (0.25 for 0 angles, 0.75 for 4 angles, etc.). What is the logic here? Is it based on how many angle variants exist, or something else?
+
+7. **When is AUF applied:**
+   - Pre-AUF: before last-slot insertion? Before OLL? (spreadsheet shows both)
+   - Post-AUF: after PLL, before the next solve starts? Or is it optional/situational?
+   - Should the baseline always include AUFs at each stage, or only when the cube state requires them?
+
+## Cube Simulator and Testing
+
+8. **Magiccube integration (you mentioned this in your prompt):**
+   - What is "magiccube"? Is it:
+     - A Python package (e.g., `pip install magiccube`)?
+     - A JavaScript library you use separately?
+     - A specific cube representation/simulator you've written?
+   - What's its main purpose for this project?
+     - Simulating cube states (applying move sequences, checking state)?
+     - Parsing algorithm strings?
+     - Counting moves?
+     - Detecting edge-orientation changes?
+   - Do you have example code or a reference for how to interface with it?
+
+9. **Algorithm testing approach:**
+   - How should I verify movecount parsing?
+     - Test against a reference implementation (magiccube's move count)?
+     - Manually verify a few examples by hand?
+   - For testing sledge inserts and edge-orientation changes:
+     - Should I apply the sledge to a sample cube state and check if edges flip?
+     - Which library/tool should simulate this (magiccube, crossSolver, or something else)?
+   - Should I enumerate all cases, sample a subset, or just verify correctness on a few?
+
+## Algorithm Definitions and Data Gaps
+
+10. **U2 insert and sledge algorithms:**
+    - What is your exact definition of "U2 insert"? (the algorithms you mentioned as [NEEDED FROM AUTHOR])
+    - Sledge insert: is this always R' F R F', or are there variants?
+    - What is the standard insert baseline to compare against? (e.g., M2 U' M U2 M' U M2 for 1x2x3 edge insertion?)
+
+11. **COLL coverage:**
+    - The JSON has coll.json with 42 cases. Is this the full COLL set you want to analyze?
+    - Should I check whether COLL's movecount is typically shorter than OLL+EPLL?
+
+## Codebase Structure Preferences
+
+12. **Python package organization:**
+    - Should the codebase be structured as a package (with __init__.py, modules, etc.), or a simpler script-based approach?
+    - Do you want separate modules for:
+      - Data loading (parsing JSON, spreadsheet, algorithm strings)
+      - Distribution handling (a Distribution class?)
+      - Convolution (DFT vs. direct, as discussed in the outline)
+      - Simulation (integration with magiccube or other cube libraries)
+      - Results/reporting (tables, charts, statistics)
+
+13. **Configuration and defaults:**
+    - Should the codebase have a config file specifying which algorithms to use (best by score? by speed?)
+    - Should AUF parameters be easily swappable for sensitivity analysis?
+
+## Validation and Scope
+
+14. **Real solve data:**
+    - You mentioned in the outline that real solve data might be available. Do you have reconstructed solves (video analysis, move logs) to validate against?
+    - If yes, in what format? (move sequences, case labels, movecount per step?)
+
+15. **Baseline scope:**
+    - Should the baseline include setup moves/rotations (x, y, z), or only the core algorithm?
+    - Is the baseline "average case" (mixing all cases equally), or should it account for F2L solution distribution?
+
+---
+
+## Summary of Immediate Next Steps (assuming answers):
+
+Once you clarify:
+1. I'll design a clean Python codebase structure with separate Distribution classes and convolution logic.
+2. I'll extract/parse algorithm movecount data (from JSON + spreadsheet, with your preferred source).
+3. I'll separate and handle AUF distribution independently from algorithm steps.
+4. I'll set up a framework for simulation/testing with magiccube (once you clarify what it is).
+5. I'll create an elegant convolution pipeline that doesn't hardcode AUF combinations.
+
